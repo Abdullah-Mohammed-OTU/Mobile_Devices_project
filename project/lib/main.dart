@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'dashboard_page.dart';
-import 'workouts_page.dart';
-import 'food_planner_page.dart';
-import 'social_feed_page.dart';
-import 'settings_page.dart';
+import 'pages/dashboard_page.dart';
+import 'pages/workouts_page.dart';
+import 'pages/food_planner_page.dart';
+import 'pages/social_feed_page.dart';
+import 'pages/settings_page.dart';
 
 void main() => runApp(const MyApp());
 
