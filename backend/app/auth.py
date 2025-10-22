@@ -17,6 +17,10 @@ def get_db():
     finally:
         db.close()
 
+@router.get("/")
+def root():
+    return {"message": "API is running!"}
+
 @router.post("/register")
 def register(email: str, username: str, password: str, db: Session = Depends(get_db)):
     if db.query(models.User).filter_by(email=email).first():
