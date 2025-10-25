@@ -4,24 +4,45 @@ import 'pages/workouts_page.dart';
 import 'pages/food_planner_page.dart';
 import 'pages/social_feed_page.dart';
 import 'pages/settings_page.dart';
+import 'pages/login_page.dart';
 
 void main() => runApp(const MyApp());
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  String? _token;
+
+  void _handleLogin(String token) {
+    setState(() => _token = token);
+  }
+
+  void _handleLogout() {
+    setState(() => _token = null);
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Fitness App',
       theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple)),
-      home: const MainPage(),
+      home: _token == null
+          ? LoginPage(onLoginSuccess: _handleLogin)
+          : MainPage(token: _token!, onLogout: _handleLogout),
     );
   }
 }
 
 class MainPage extends StatefulWidget {
-  const MainPage({super.key});
+  const MainPage({super.key, required this.token, required this.onLogout});
+
+  final String token;
+  final VoidCallback onLogout;
 
   @override
   State<MainPage> createState() => _MainPageState();
@@ -48,7 +69,16 @@ class _MainPageState extends State<MainPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Fitness App')),
+      appBar: AppBar(
+        title: const Text('Fitness App'),
+        actions: [
+          IconButton(
+            onPressed: widget.onLogout,
+            icon: const Icon(Icons.logout),
+            tooltip: 'Log out',
+          ),
+        ],
+      ),
       body: _pages[_selectedIndex], // show current page
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed, // allows more than 3 items

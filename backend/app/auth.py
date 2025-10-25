@@ -1,14 +1,29 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
+import secrets, os, hashlib, bcrypt
 from . import database, models, email_utils, jwt_handler
-import secrets, os
 from dotenv import load_dotenv
 
 load_dotenv()
 router = APIRouter()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 PEPPER = os.getenv("PEPPER")
+
+if not PEPPER:
+    raise RuntimeError("PEPPER environment variable must be set.")
+
+
+def _prepare_password(password: str) -> bytes:
+    """Combine user password with the pepper and hash before bcrypt."""
+    combined = f"{password}{PEPPER}".encode("utf-8")
+    return hashlib.sha256(combined).digest()
+
+
+def _hash_password(password: str) -> str:
+    return bcrypt.hashpw(_prepare_password(password), bcrypt.gensalt()).decode("utf-8")
+
+
+def _verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(_prepare_password(password), hashed.encode("utf-8"))
 
 def get_db():
     db = database.SessionLocal()
@@ -26,7 +41,7 @@ def register(email: str, username: str, password: str, db: Session = Depends(get
     if db.query(models.User).filter_by(email=email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    hashed_pw = pwd_context.hash(password + PEPPER)
+    hashed_pw = _hash_password(password)
     token = secrets.token_urlsafe(32)
     user = models.User(email=email, username=username, password=hashed_pw, verification_token=token)
     db.add(user)
@@ -53,7 +68,7 @@ def login(email: str, password: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     if not user.is_verified:
         raise HTTPException(status_code=401, detail="Email not verified")
-    if not pwd_context.verify(password + PEPPER, user.password):
+    if not _verify_password(password, user.password):
         raise HTTPException(status_code=401, detail="Incorrect password")
     token = jwt_handler.create_token(email)
     return {"token": token}
@@ -75,7 +90,7 @@ def reset_password(token: str, new_password: str, db: Session = Depends(get_db))
     user = db.query(models.User).filter_by(reset_token=token).first()
     if not user:
         raise HTTPException(status_code=400, detail="Invalid token")
-    user.password = pwd_context.hash(new_password + PEPPER)
+    user.password = _hash_password(new_password)
     user.reset_token = None
     db.commit()
     return {"message": "Password updated"}
