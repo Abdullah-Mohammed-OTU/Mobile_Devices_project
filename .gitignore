@@ -1,4 +1,4 @@
-# Gradle files
+ # Gradle files
 .gradle/
 build/
 
@@ -32,3 +32,4 @@ google-services.json
 
 # Android Profiling
 *.hprof
+Mobile_Devices_project.code-workspace

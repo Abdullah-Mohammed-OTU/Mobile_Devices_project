@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:http/http.dart' as http;
 
 /// Basic API client for the authentication endpoints exposed by the FastAPI backend.
@@ -7,11 +6,14 @@ class AuthService {
   AuthService({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
-  static const String _baseUrl = 'http://127.0.0.1:8000';
+  static const String _baseUrl = 'http://10.0.2.2:8000'; // Android emulator localhost
 
-  Future<http.Response> _post(String path, Map<String, String> query) {
-    final uri = Uri.parse('$_baseUrl$path').replace(queryParameters: query);
-    return _client.post(uri);
+  Future<http.Response> _post(String path, Map<String, String> body) {
+    return _client.post(
+      Uri.parse('$_baseUrl$path'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
   }
 
   /// Performs a login against the backend and returns the issued JWT token.
@@ -47,11 +49,12 @@ class AuthService {
       'username': username,
       'password': password,
     });
+    print("RESPONSE: ${response.statusCode} ${response.body}");
 
     final Map<String, dynamic>? payload =
         response.body.isNotEmpty ? jsonDecode(response.body) as Map<String, dynamic>? : null;
 
-    if (response.statusCode == 200 && payload != null && payload['message'] is String) {
+    if (response.statusCode == 201 && payload != null && payload['message'] is String) {
       return payload['message'] as String;
     }
 
