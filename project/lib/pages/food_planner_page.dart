@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/notifications_service.dart';
 
 class FoodPlannerPage extends StatefulWidget {
   const FoodPlannerPage({super.key});
@@ -13,6 +14,24 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
   final List<String> _dinner = [];
   final List<String> _snack = [];
   final List<String> _foods = ["Eggs", "Chicken", "Broccoli", "Bread"];
+  bool _mealsNotificationSent = false;
+
+  Future<void> _maybeNotifyWhenComplete() async {
+    final allSelected = _breakfast.isNotEmpty &&
+        _lunch.isNotEmpty &&
+        _dinner.isNotEmpty &&
+        _snack.isNotEmpty;
+
+    if (allSelected && !_mealsNotificationSent) {
+      _mealsNotificationSent = true; // set guard first to avoid double-firing
+      await NotificationService.instance.notifyFoodPlanner();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Food Plan Complete')),
+        );
+      }
+    }
+  }
 
   void _showFoodPicker(List<String> mealList) {
     showDialog(
@@ -23,11 +42,12 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
           children: _foods.map((food) {
             return SimpleDialogOption(
               child: Text(food),
-              onPressed: () {
+              onPressed: () async {
                 setState(() {
                   mealList.add(food);
                 });
                 Navigator.pop(context);
+                await _maybeNotifyWhenComplete();
               },
             );
           }).toList(),

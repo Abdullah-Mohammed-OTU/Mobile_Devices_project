@@ -5,8 +5,14 @@ import 'pages/food_planner_page.dart';
 import 'pages/social_feed_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/login_page.dart';
+import 'services/notifications_service.dart';
 
-void main() => runApp(const MyApp());
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.instance.init();
+  runApp(const MyApp());
+}
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -79,9 +85,9 @@ class _MainPageState extends State<MainPage> {
           ),
         ],
       ),
-      body: _pages[_selectedIndex], // show current page
+      body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed, // allows more than 3 items
+        type: BottomNavigationBarType.fixed,
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         items: const [
@@ -95,3 +101,4 @@ class _MainPageState extends State<MainPage> {
     );
   }
 }
+
