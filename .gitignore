@@ -41,6 +41,7 @@ venv/
 # Byte-compiled / cache files
 __pycache__/
 *.pyc
+__pycache__/
 
 # IDE/project files
 .vscode/
