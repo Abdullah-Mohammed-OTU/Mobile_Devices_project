@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app import database, models, auth
+from app import database, models, auth, food_log
 from fastapi.middleware.cors import CORSMiddleware
 
 models.Base.metadata.create_all(bind=database.engine)
@@ -13,3 +13,4 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(auth.router)
+app.include_router(food_log.router)
