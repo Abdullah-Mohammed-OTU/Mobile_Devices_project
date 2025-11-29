@@ -48,3 +48,6 @@ __pycache__/
 
 # macOS system files
 .DS_Store
+
+backend/app/token.json
+Backend/app/credentials.json
