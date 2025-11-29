@@ -33,3 +33,18 @@ google-services.json
 # Android Profiling
 *.hprof
 Mobile_Devices_project.code-workspace
+
+#Virtual environment
+.venv/
+venv/
+
+# Byte-compiled / cache files
+__pycache__/
+*.pyc
+
+# IDE/project files
+.vscode/
+.idea/
+
+# macOS system files
+.DS_Store

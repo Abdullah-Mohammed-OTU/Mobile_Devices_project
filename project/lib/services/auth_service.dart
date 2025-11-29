@@ -6,7 +6,7 @@ class AuthService {
   AuthService({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
-  static const String _baseUrl = 'http://10.0.2.2:8000'; // Android emulator localhost
+  static const String _baseUrl = 'https://mobile-devices-project.onrender.com'; // Android emulator localhost
 
   Future<http.Response> _post(String path, Map<String, String> body) {
     return _client.post(
