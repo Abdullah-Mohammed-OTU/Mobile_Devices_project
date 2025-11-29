@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, Depends, status, JSONResponse
+from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import secrets, os, hashlib, bcrypt
 from . import database, models, email_utils, jwt_handler
