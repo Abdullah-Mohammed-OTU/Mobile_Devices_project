@@ -5,6 +5,7 @@ Project for CSCI4100U that pairs a FastAPI backend with a Flutter mobile client.
 ## Getting Started
 
 ### Backend (FastAPI)
+- Login logic is also deployed at `https://mobile-devices-project.onrender.com` (used by the app by default). The service may sleep when idle; if login fails, visit that URL in a browser, wait for the JSON `{"message": "API is running!"}`, then try logging in again. If it still fails, run the backend locally using the steps below.
 - Ensure you have Python 3.10+.
 - Create a virtual environment and install dependencies:
   - `cd backend`
