@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, JSONResponse
 from sqlalchemy.orm import Session
 import secrets, os, hashlib, bcrypt
 from . import database, models, email_utils, jwt_handler
@@ -65,9 +65,9 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
 
-    verify_link = f"http://localhost:8000/verify/{token}"
+    verify_link = f"https://mobile-devices-project.onrender.com//verify/{token}"
     email_utils.send_email(payload.email, "Verify your account", f"Click to verify: {verify_link}")
-    return {"message": "Verification email sent"}, status.HTTP_201_CREATED
+    return JSONResponse(content={"message": "Verification email sent"}, status_code=status.HTTP_201_CREATED)
 
 @router.get("/verify/{token}")
 def verify(token: str, db: Session = Depends(get_db)):
