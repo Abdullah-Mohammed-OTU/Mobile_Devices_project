@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../services/notifications_service.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key, this.onLogout});
+
+  final VoidCallback? onLogout;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -44,6 +46,12 @@ class _SettingsPageState extends State<SettingsPage> {
             subtitle: const Text('Enable workout and meal reminders'),
             value: _notificationsEnabled,
             onChanged: _loading ? null : _toggleNotifications,
+          ),
+          const SizedBox(height: 24),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Log out'),
+            onTap: widget.onLogout,
           ),
         ],
       ),

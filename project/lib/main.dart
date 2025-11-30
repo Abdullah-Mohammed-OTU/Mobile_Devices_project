@@ -58,13 +58,13 @@ class _MainPageState extends State<MainPage> {
   int _selectedIndex = 0;
 
   // List of pages for the bottom nav bar
-  static const List<Widget> _pages = <Widget>[
-    DashboardPage(),
-    WorkoutsPage(),
-    FoodPlannerPage(),
-    SocialFeedPage(),
-    SettingsPage(),
-  ];
+  List<Widget> get _pages => <Widget>[
+        const DashboardPage(),
+        const WorkoutsPage(),
+        const FoodPlannerPage(),
+        SocialFeedPage(),
+        SettingsPage(onLogout: widget.onLogout),
+      ];
 
   void _onItemTapped(int index) {
     setState(() {
@@ -77,13 +77,6 @@ class _MainPageState extends State<MainPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Fitness App'),
-        actions: [
-          IconButton(
-            onPressed: widget.onLogout,
-            icon: const Icon(Icons.logout),
-            tooltip: 'Log out',
-          ),
-        ],
       ),
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
@@ -101,4 +94,3 @@ class _MainPageState extends State<MainPage> {
     );
   }
 }
-
