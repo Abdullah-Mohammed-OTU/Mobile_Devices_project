@@ -4,18 +4,44 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../services/notifications_service.dart';
+import '../services/macro_tracker.dart';
+
+class _FoodItem {
+  _FoodItem({
+    required this.name,
+    required this.calories,
+    required this.protein,
+    required this.carbs,
+    required this.fat,
+  });
+
+  final String name;
+  final double calories;
+  final double protein;
+  final double carbs;
+  final double fat;
+
+  String get label => '$name (${calories.toStringAsFixed(0)} cal)';
+
+  MacroTotals get macros => MacroTotals(
+        calories: calories,
+        protein: protein,
+        carbs: carbs,
+        fat: fat,
+      );
+}
 
 class _DayPlan {
-  final List<String> breakfast = [];
-  final List<String> lunch = [];
-  final List<String> dinner = [];
-  final List<String> snack = [];
+  final List<_FoodItem> breakfast = [];
+  final List<_FoodItem> lunch = [];
+  final List<_FoodItem> dinner = [];
+  final List<_FoodItem> snack = [];
   bool mealsNotificationSent = false;
   String? analysisResult;
   String? analysisError;
 }
 
-const String _geminiApiKey = 'AIzaSyBQRw-dFR4h1f15gS-iamjMzCjLkk2vZKk';
+const String _geminiApiKey = 'AIzaSyDXNgrLMqotpKCrKpbeG4r09pLicNCCpr8';
 const String _geminiModel = 'gemini-2.5-flash';
 const String _foodPlannerSystemPrompt =
     'You are a concise nutrition assistant. Respond ONLY with raw JSON (no markdown) in the exact shape '
@@ -35,6 +61,12 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
 
   final Map<String, _DayPlan> _plans = {};
 
+  @override
+  void initState() {
+    super.initState();
+    _updateMacroTotals();
+  }
+
   Future<void> _maybeNotifyWhenComplete() async {
     final plan = _currentPlan;
     final allSelected = plan.breakfast.isNotEmpty &&
@@ -43,7 +75,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
         plan.snack.isNotEmpty;
 
     if (allSelected && !plan.mealsNotificationSent) {
-      plan.mealsNotificationSent = true; // guard so it only fires once
+      plan.mealsNotificationSent = true; 
       await NotificationService.instance.notifyFoodPlanner();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -84,7 +116,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
     return firstPart?['text'] as String?;
   }
 
-  void _showFoodSearchDialog(List<String> mealList, String mealType) {
+  void _showFoodSearchDialog(List<_FoodItem> mealList, String mealType) {
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -149,7 +181,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
                       ],
                       'generationConfig': {
                         'temperature': 0.0,
-                        'maxOutputTokens': 512,
+                        'maxOutputTokens': 5000,
                         'responseMimeType': 'application/json',
                         'responseSchema': {
                           'type': 'object',
@@ -281,7 +313,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
                                    (item['carbohydrates_total_g'] as num?)
                                            ?.toDouble() ??
                                        0;
-                               final double fat =
+                                 final double fat =
                                    (item['fat_total_g'] as num?)?.toDouble() ??
                                        0;
 
@@ -299,12 +331,17 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
                                    'P: ${protein.toStringAsFixed(1)}g · C: ${carbs.toStringAsFixed(1)}g · F: ${fat.toStringAsFixed(1)}g',
                                  ),
                                  onTap: () async {
-                                   final label =
-                                       '$name (${calories.toStringAsFixed(0)} cal)';
-
+                                   final entry = _FoodItem(
+                                     name: name,
+                                     calories: calories,
+                                     protein: protein,
+                                     carbs: carbs,
+                                     fat: fat,
+                                   );
                                    setState(() {
-                                     mealList.add(label);
+                                     mealList.add(entry);
                                    });
+                                   _updateMacroTotals();
                                    Navigator.of(dialogContext).pop();
                                    await _maybeNotifyWhenComplete();
                                  },
@@ -355,12 +392,29 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
         _analysisLoading = false;
         _currentPlan.mealsNotificationSent = false;
       });
+      _updateMacroTotals();
     }
   }
 
   _DayPlan get _currentPlan {
     final key = _formatDate(_selectedDate);
     return _plans.putIfAbsent(key, () => _DayPlan());
+  }
+
+  void _updateMacroTotals() {
+    final plan = _currentPlan;
+    final items = <_FoodItem>[]
+      ..addAll(plan.breakfast)
+      ..addAll(plan.lunch)
+      ..addAll(plan.dinner)
+      ..addAll(plan.snack);
+
+    MacroTotals totals = MacroTotals.empty;
+    for (final item in items) {
+      totals = totals + item.macros;
+    }
+
+    MacroTracker.instance.setTotalsForDate(_selectedDate, totals);
   }
 
   void _clearCurrentPlan() {
@@ -375,6 +429,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
     setState(() {
       _analysisLoading = false;
     });
+    _updateMacroTotals();
   }
 
   Future<void> _analyzePlan() async {
@@ -419,7 +474,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
               'parts': [
                 {
                   'text':
-                      'Breakfast: ${_currentPlan.breakfast.join(', ')}\nLunch: ${_currentPlan.lunch.join(', ')}\nDinner: ${_currentPlan.dinner.join(', ')}\nSnack: ${_currentPlan.snack.join(', ')}'
+                      'Breakfast: ${_currentPlan.breakfast.map((item) => item.label).join(', ')}\nLunch: ${_currentPlan.lunch.map((item) => item.label).join(', ')}\nDinner: ${_currentPlan.dinner.map((item) => item.label).join(', ')}\nSnack: ${_currentPlan.snack.map((item) => item.label).join(', ')}'
                 },
               ],
             },
@@ -467,7 +522,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
   }
 
   Widget _buildMealSection(
-      String title, List<String> mealList, VoidCallback onAddPressed) {
+      String title, List<_FoodItem> mealList, VoidCallback onAddPressed) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20.0),
       child: Column(
@@ -482,7 +537,9 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            mealList.isEmpty ? 'No items' : mealList.join(', '),
+            mealList.isEmpty
+                ? 'No items'
+                : mealList.map((item) => item.label).join(', '),
           ),
           const SizedBox(height: 8),
           ElevatedButton(

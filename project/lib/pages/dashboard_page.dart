@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
+import '../services/macro_tracker.dart';
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -14,6 +16,23 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   bool _isTracking = false;
   int _steps = 0;
+  DateTime _todayDate = DateTime.now();
+  MacroTotals _todayTotals = MacroTotals.empty;
+  late final VoidCallback _macroListener;
+
+  @override
+  void initState() {
+    super.initState();
+    _todayDate = _startOfToday();
+    _todayTotals = MacroTracker.instance.totalsForDate(_todayDate);
+    _macroListener = () {
+      setState(() {
+        _todayDate = _startOfToday();
+        _todayTotals = MacroTracker.instance.totalsForDate(_todayDate);
+      });
+    };
+    MacroTracker.instance.addListener(_macroListener);
+  }
 
   StreamSubscription<AccelerometerEvent>? _accSub;
   StreamSubscription<GyroscopeEvent>? _gyroSub;
@@ -108,8 +127,21 @@ class _DashboardPageState extends State<DashboardPage> {
     _lastMagnitude = mag;
   }
 
+  DateTime _startOfToday() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  String _formatDate(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
   @override
   void dispose() {
+    MacroTracker.instance.removeListener(_macroListener);
     _accSub?.cancel();
     _gyroSub?.cancel();
     super.dispose();
@@ -124,6 +156,11 @@ class _DashboardPageState extends State<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              'Today: ${_formatDate(_todayDate)}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 ElevatedButton(
@@ -139,6 +176,28 @@ class _DashboardPageState extends State<DashboardPage> {
                 if (_isTracking)
                   const Text('(tracking)', style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
               ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "Today's macros",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Calories: ${_todayTotals.calories.toStringAsFixed(0)} cal',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            Text(
+              'Protein: ${_todayTotals.protein.toStringAsFixed(1)} g',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            Text(
+              'Carbs: ${_todayTotals.carbs.toStringAsFixed(1)} g',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            Text(
+              'Fat: ${_todayTotals.fat.toStringAsFixed(1)} g',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
           ],
         ),
