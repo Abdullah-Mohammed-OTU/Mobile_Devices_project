@@ -3,6 +3,7 @@ import '../services/notifications_service.dart';
 import '../workout_api/exercise_api.dart';
 import '../workout_api/exercise_model.dart';
 import '../workout_api/workout_db.dart';
+import '../services/workout_generator.dart';
 
 class WorkoutsPage extends StatefulWidget {
   const WorkoutsPage({super.key});
@@ -14,6 +15,10 @@ class WorkoutsPageState extends State<WorkoutsPage> {
   Exercise? chosen;
   List<Exercise> apiExercises = [];
   List<String> saved = [];
+
+  // AI plan holder (structured map from generator)
+  Map<String, dynamic>? plan;
+
   @override
   void initState() {
     super.initState();
@@ -26,8 +31,7 @@ class WorkoutsPageState extends State<WorkoutsPage> {
       setState(() {
         apiExercises = list.take(50).toList();
       });
-    }
-    catch (e) {
+    } catch (e) {
       debugPrint("API error");
     }
   }
@@ -61,7 +65,8 @@ class WorkoutsPageState extends State<WorkoutsPage> {
 
   void logSetsReps() {
     if (chosen == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pick a workout first")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Pick a workout first")));
       return;
     }
 
@@ -164,7 +169,7 @@ class WorkoutsPageState extends State<WorkoutsPage> {
               const SizedBox(height: 12),
               ListTile(
                 title: const Text("10 minutes"),
-                onTap: () => _runTimedWorkout(ctx, 12),
+                onTap: () => _runTimedWorkout(ctx, 10),
               ),
               ListTile(
                 title: const Text("20 minutes"),
@@ -191,21 +196,104 @@ class WorkoutsPageState extends State<WorkoutsPage> {
     Navigator.pop(dialogContext);
     await NotificationService.instance.notifyWorkoutStart();
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text("Workout started for $minutes minutes")));
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Workout started for $minutes minutes")));
     await Future.delayed(Duration(minutes: minutes));
     await NotificationService.instance.notifyWorkoutComplete(minutes);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Workout complete! ($minutes min)")));
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Workout complete! ($minutes min)")));
+  }
+
+  // ---------- AI popup (Option C) ----------
+  void showAIPopup() {
+    String tempGoal = "hypertrophy";
+    String tempDifficulty = "beginner";
+    int tempDays = 4;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(builder: (ctx, setDlgState) {
+          return AlertDialog(
+            title: const Text("Generate AI Workout"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Goal"),
+                const SizedBox(height: 6),
+                DropdownButton<String>(
+                  value: tempGoal,
+                  items: const [
+                    DropdownMenuItem(value: "hypertrophy", child: Text("Hypertrophy")),
+                    DropdownMenuItem(value: "strength", child: Text("Strength")),
+                    DropdownMenuItem(value: "fat_loss", child: Text("Fat Loss")),
+                    DropdownMenuItem(value: "general_fitness", child: Text("General Fitness")),
+                    DropdownMenuItem(value: "athletic_performance", child: Text("Athletic Performance")),
+                  ],
+                  onChanged: (v) => setDlgState(() => tempGoal = v!),
+                ),
+                const SizedBox(height: 8),
+                const Text("Difficulty"),
+                const SizedBox(height: 6),
+                DropdownButton<String>(
+                  value: tempDifficulty,
+                  items: const [
+                    DropdownMenuItem(value: "beginner", child: Text("Beginner")),
+                    DropdownMenuItem(value: "intermediate", child: Text("Intermediate")),
+                    DropdownMenuItem(value: "advanced", child: Text("Advanced")),
+                  ],
+                  onChanged: (v) => setDlgState(() => tempDifficulty = v!),
+                ),
+                const SizedBox(height: 8),
+                const Text("Days per week"),
+                const SizedBox(height: 6),
+                DropdownButton<int>(
+                  value: tempDays,
+                  items: const [
+                    DropdownMenuItem(value: 3, child: Text("3 days")),
+                    DropdownMenuItem(value: 4, child: Text("4 days")),
+                    DropdownMenuItem(value: 5, child: Text("5 days")),
+                    DropdownMenuItem(value: 6, child: Text("6 days")),
+                  ],
+                  onChanged: (v) => setDlgState(() => tempDays = v!),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                child: const Text("Cancel"),
+                onPressed: () => Navigator.pop(context),
+              ),
+              TextButton(
+                child: const Text("Generate"),
+                onPressed: () {
+                  // generate and close dialog
+                  final result = WorkoutGenerator.generate(
+                    goal: tempGoal,
+                    daysPerWeek: tempDays,
+                    difficulty: tempDifficulty,
+                  );
+                  setState(() => plan = result);
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          );
+        });
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Workouts")),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Logged workouts (if any)
             if (saved.isNotEmpty)
               Container(
                 constraints: const BoxConstraints(
@@ -217,6 +305,8 @@ class WorkoutsPageState extends State<WorkoutsPage> {
                   textAlign: TextAlign.left,
                 ),
               ),
+
+            // Chosen workout display
             if (chosen != null) ...[
               const SizedBox(height: 12),
               Text(
@@ -225,7 +315,40 @@ class WorkoutsPageState extends State<WorkoutsPage> {
                 textAlign: TextAlign.left,
               ),
             ],
-            const Spacer(),
+
+            const SizedBox(height: 12),
+
+            // AI plan display area (if generated)
+            if (plan != null) ...[
+              const SizedBox(height: 8),
+              const Text(
+                "AI Workout Plan:",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ListView(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                children: (plan!["plan"] as List).map((day) {
+                  return Card(
+                    child: ListTile(
+                      title: Text("${day['day']} — ${day['type']}"),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: (day['exercises'] as List)
+                            .map<Widget>((e) => Text("• $e"))
+                            .toList(),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            const SizedBox(height: 12),
+
+            // Primary buttons (kept from original)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -250,6 +373,11 @@ class WorkoutsPageState extends State<WorkoutsPage> {
                     ElevatedButton(
                       onPressed: startWorkoutDialog,
                       child: const Text("Start Workout"),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: showAIPopup,
+                      child: const Text("Generate AI Workout Plan"),
                     ),
                     const SizedBox(height: 20),
                   ],
