@@ -7,7 +7,7 @@ models.Base.metadata.create_all(bind=database.engine)
 app = FastAPI(title="Flutter Fitness Backend")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # for now; later you can restrict to real domain
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
