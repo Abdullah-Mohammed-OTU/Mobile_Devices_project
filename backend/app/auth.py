@@ -117,7 +117,7 @@ def reset_password(token: str, payload: ResetPasswordRequest, db: Session = Depe
     return {"message": "Password updated"}
 
 
-@router.post("/delete-account")
+@router.delete("/delete-account")
 def delete_account(payload: DeleteAccountRequest, db: Session = Depends(get_db)):
     user = db.query(models.User).filter_by(email=payload.email).first()
     if not user:
