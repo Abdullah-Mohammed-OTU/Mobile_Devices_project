@@ -9,6 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/macro_tracker.dart';
 import '../workout_api/workout_db.dart';
+import 'workouts_page.dart';
+import 'food_planner_page.dart';
+import '../main.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -246,9 +249,11 @@ class _DashboardPageState extends State<DashboardPage> {
         case 'steps':
           return Card(
             key: ValueKey(id),
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
+            child: InkWell(
+              onTap: () => navigateToBottomTab(1),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Center(
@@ -286,13 +291,16 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             ),
+            ),
           );
         case 'macros':
           return Card(
             key: ValueKey(id),
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
+            child: InkWell(
+              onTap: () => navigateToBottomTab(2),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Center(
@@ -335,6 +343,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             ),
+            ),
           );
         case 'calories':
           final caloriesIn = _todayTotals.calories;
@@ -342,9 +351,11 @@ class _DashboardPageState extends State<DashboardPage> {
           final net = caloriesIn - caloriesOut;
           return Card(
             key: ValueKey(id),
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
+            child: InkWell(
+              onTap: () => navigateToBottomTab(2),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Center(
@@ -439,6 +450,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             ),
+            ),
           );
         case 'weight_history':
           // show recent weight entries and a small trend
@@ -478,9 +490,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
           return Card(
             key: ValueKey(id),
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
+            child: InkWell(
+              onTap: () => navigateToBottomTab(2),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Center(child: ReorderableDragStartListener(index: index, child: const Icon(Icons.drag_handle))),
@@ -501,6 +515,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ],
                 ],
               ),
+            ),
             ),
           );
         default:

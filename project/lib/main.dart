@@ -7,6 +7,16 @@ import 'pages/settings_page.dart';
 import 'pages/login_page.dart';
 import 'services/notifications_service.dart';
 
+// Global key and helper to allow other widgets to change the selected bottom tab.
+final GlobalKey<_MainPageState> mainPageKey = GlobalKey<_MainPageState>();
+
+/// Call to switch the bottom navigation index from other pages.
+void navigateToBottomTab(int index) {
+  try {
+    mainPageKey.currentState?.setSelectedIndex(index);
+  } catch (_) {}
+}
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,9 +75,9 @@ class _MyAppState extends State<MyApp> {
         ),
         textTheme: ThemeData.light().textTheme.apply(bodyColor: Colors.black87),
       ),
-      home: _token == null
+        home: _token == null
           ? LoginPage(onLoginSuccess: _handleLogin)
-          : MainPage(token: _token!, onLogout: _handleLogout),
+          : MainPage(key: mainPageKey, token: _token!, onLogout: _handleLogout),
     );
   }
 }
@@ -98,6 +108,12 @@ class _MainPageState extends State<MainPage> {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  // Public setter used by `navigateToBottomTab` helper.
+  void setSelectedIndex(int index) {
+    if (index < 0 || index >= _pages.length) return;
+    setState(() => _selectedIndex = index);
   }
 
   @override
