@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/widgets.dart';
 
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -472,6 +473,9 @@ class _DashboardPageState extends State<DashboardPage> {
             trendColor = displayDelta < 0 ? Colors.green : (displayDelta > 0 ? Colors.red : Colors.grey);
           }
 
+          // build numeric list for sparkline (in user's unit)
+          final recentVals = recent.map((e) => _weightUnit == 'kg' ? e.value : e.value * 2.2046226218).toList();
+
           return Card(
             key: ValueKey(id),
             child: Padding(
@@ -481,19 +485,15 @@ class _DashboardPageState extends State<DashboardPage> {
                 children: [
                   Center(child: ReorderableDragStartListener(index: index, child: const Icon(Icons.drag_handle))),
                   const SizedBox(height: 8),
-                  const Text('Weight History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const Text('Weight', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
                   if (recent.isEmpty)
                     const Text('')
                   else ...[
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: recent.reversed.take(5).map((e) {
-                        final date = e.key;
-                        final val = _weightUnit == 'kg' ? e.value : e.value * 2.2046226218;
-                        return Chip(label: Text('$date: ${val.toStringAsFixed(1)} ${_weightUnit}'));
-                      }).toList(),
+                    // Sparkline showing recent values (most recent on right)
+                    SizedBox(
+                      height: 48,
+                      child: _WeightSparkline(values: recentVals, lineColor: Theme.of(context).colorScheme.primary),
                     ),
                     const SizedBox(height: 8),
                     if (trendText != null)
@@ -526,4 +526,80 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // order of dashboard cards (keys like 'steps','macros','calories')
   List<String> _cardOrder = ['steps', 'macros', 'calories'];
+}
+
+// Simple sparkline widget for weight values.
+class _WeightSparkline extends StatelessWidget {
+  final List<double> values;
+  final Color lineColor;
+  const _WeightSparkline({required this.values, required this.lineColor, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _SparklinePainter(values, lineColor),
+      size: Size.infinite,
+    );
+  }
+}
+
+class _SparklinePainter extends CustomPainter {
+  final List<double> values;
+  final Color color;
+  _SparklinePainter(this.values, this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.isEmpty) return;
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..isAntiAlias = true;
+
+    final fillPaint = Paint()
+      ..color = color.withOpacity(0.12)
+      ..style = PaintingStyle.fill;
+
+    final minV = values.reduce(min);
+    final maxV = values.reduce(max);
+    final range = (maxV - minV) == 0 ? 1.0 : (maxV - minV);
+
+    final dx = values.length > 1 ? size.width / (values.length - 1) : size.width;
+
+    final path = Path();
+    for (var i = 0; i < values.length; i++) {
+      final x = dx * i;
+      final norm = (values[i] - minV) / range;
+      final y = size.height - (norm * size.height);
+      if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+    }
+
+    // draw filled area under curve
+    final fillPath = Path.from(path);
+    fillPath.lineTo(size.width, size.height);
+    fillPath.lineTo(0, size.height);
+    fillPath.close();
+    canvas.drawPath(fillPath, fillPaint);
+
+    // draw line
+    canvas.drawPath(path, paint);
+
+    // draw a small dot on last point
+    final lastX = dx * (values.length - 1);
+    final lastNorm = (values.last - minV) / range;
+    final lastY = size.height - (lastNorm * size.height);
+    final dotPaint = Paint()..color = color;
+    canvas.drawCircle(Offset(lastX, lastY), 3.0, dotPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SparklinePainter oldDelegate) {
+    if (oldDelegate.values.length != values.length) return true;
+    for (var i = 0; i < values.length; i++) {
+      if (oldDelegate.values[i] != values[i]) return true;
+    }
+    return oldDelegate.color != color;
+  }
 }

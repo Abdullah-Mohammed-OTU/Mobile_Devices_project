@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/notifications_service.dart';
@@ -50,6 +51,49 @@ class _SettingsPageState extends State<SettingsPage> {
       _notificationsEnabled = value;
     });
     await NotificationService.instance.setEnabled(value);
+  }
+
+  Future<void> _insertFakeWeek() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final histJson = prefs.getString('weight_history');
+      final map = <String, double>{};
+      if (histJson != null) {
+        try {
+          final decoded = jsonDecode(histJson) as Map<String, dynamic>;
+          decoded.forEach((k, v) {
+            final d = (v is num) ? v.toDouble() : double.tryParse('$v') ?? 0.0;
+            map[k] = d;
+          });
+        } catch (e) {}
+      }
+
+      final base = prefs.getDouble('user_weight_kg') ?? 75.0;
+      final today = DateTime.now();
+      // create a gentle variation over 7 days
+      for (int i = 6; i >= 0; i--) {
+        final dt = today.subtract(Duration(days: i));
+        final key = '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+        // small variation around base: -0.6 .. +0.6
+        final weight = base + ((i - 3) * 0.2);
+        map[key] = double.parse(weight.toStringAsFixed(1));
+      }
+
+      await prefs.setString('weight_history', jsonEncode(map));
+      // set the default user weight to today's weight
+      final todaysKey = '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      final todaysWeight = map[todaysKey] ?? base;
+      await prefs.setDouble('user_weight_kg', todaysWeight);
+
+      if (mounted) {
+        setState(() {
+          _weightUnit = prefs.getString('weight_unit') ?? 'kg';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Inserted sample weight week')));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to insert sample data')));
+    }
   }
 
   @override
@@ -107,6 +151,31 @@ class _SettingsPageState extends State<SettingsPage> {
               leading: const Icon(Icons.logout),
               title: const Text('Log out'),
               onTap: widget.onLogout,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.data_usage),
+              title: const Text('Insert sample weight week'),
+              subtitle: const Text('Populate your weight history with a week of example values'),
+              onTap: () async {
+                // confirm before inserting
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Insert sample data'),
+                    content: const Text('This will add a week of example weight entries to your history. Continue?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Insert')),
+                    ],
+                  ),
+                );
+                if (ok == true) {
+                  await _insertFakeWeek();
+                }
+              },
             ),
           ),
         ],
