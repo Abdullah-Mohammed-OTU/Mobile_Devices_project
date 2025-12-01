@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
+//
 class Post {
   Post({this.id, this.username, this.content, this.dateAndTime});
 
