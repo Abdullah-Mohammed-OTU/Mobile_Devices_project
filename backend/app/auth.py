@@ -118,13 +118,18 @@ def reset_password(token: str, payload: ResetPasswordRequest, db: Session = Depe
 
 
 @router.delete("/delete-account")
-def delete_account(payload: DeleteAccountRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter_by(email=payload.email).first()
+@router.delete("/delete-account/")
+def delete_account(payload: DeleteAccountRequest | None = None, email: str | None = None, db: Session = Depends(get_db)):
+    target_email = (payload.email if payload else None) or email
+    if not target_email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    user = db.query(models.User).filter_by(email=target_email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     # Remove any associated data first (currently food logs keyed by user email)
-    db.query(models.FoodLog).filter_by(user=payload.email).delete()
+    db.query(models.FoodLog).filter_by(user=target_email).delete()
     db.delete(user)
     db.commit()
     return {"message": "Account and related data deleted"}
