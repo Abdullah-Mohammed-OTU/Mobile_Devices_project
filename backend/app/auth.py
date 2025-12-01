@@ -54,6 +54,9 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     new_password: str
 
+class DeleteAccountRequest(BaseModel):
+    email: str
+
 
 @router.post("/register")
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
@@ -112,3 +115,16 @@ def reset_password(token: str, payload: ResetPasswordRequest, db: Session = Depe
     user.reset_token = None
     db.commit()
     return {"message": "Password updated"}
+
+
+@router.post("/delete-account")
+def delete_account(payload: DeleteAccountRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter_by(email=payload.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Remove any associated data first (currently food logs keyed by user email)
+    db.query(models.FoodLog).filter_by(user=payload.email).delete()
+    db.delete(user)
+    db.commit()
+    return {"message": "Account and related data deleted"}
