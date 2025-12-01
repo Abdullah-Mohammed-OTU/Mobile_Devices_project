@@ -182,15 +182,19 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   int _selectedIndex = 0;
+  late final List<Widget> _pages;
 
-  // List of pages for the bottom nav bar
-  List<Widget> get _pages => <Widget>[
-        const DashboardPage(),
-        const WorkoutsPage(),
-        const FoodPlannerPage(),
-        SocialFeedPage(),
-        SettingsPage(onLogout: widget.onLogout),
-      ];
+  @override
+  void initState() {
+    super.initState();
+    _pages = <Widget>[
+      const DashboardPage(),
+      const WorkoutsPage(),
+      const FoodPlannerPage(),
+      SocialFeedPage(),
+      SettingsPage(onLogout: widget.onLogout),
+    ];
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -207,7 +211,12 @@ class _MainPageState extends State<MainPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(child: _pages[_selectedIndex]),
+      body: SafeArea(
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: _pages,
+        ),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _selectedIndex,

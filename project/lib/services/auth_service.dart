@@ -49,7 +49,6 @@ class AuthService {
       'username': username,
       'password': password,
     });
-    print("RESPONSE: ${response.statusCode} ${response.body}");
 
     final Map<String, dynamic>? payload =
         response.body.isNotEmpty ? jsonDecode(response.body) as Map<String, dynamic>? : null;

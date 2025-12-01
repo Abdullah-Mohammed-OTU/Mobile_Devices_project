@@ -42,7 +42,7 @@ class _DayPlan {
   String? analysisError;
 }
 
-const String _geminiApiKey = 'AIzaSyDXNgrLMqotpKCrKpbeG4r09pLicNCCpr8';
+const String _geminiApiKey = '';
 const String _geminiModel = 'gemini-2.5-flash';
 const String _foodPlannerSystemPrompt =
     'You are a concise nutrition assistant. Respond ONLY with raw JSON (no markdown) in the exact shape '
@@ -163,7 +163,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
       await NotificationService.instance.notifyFoodPlanner();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Food Plan Complete')),
+          const SnackBar(content: Text('Congrats, you logged all your food for the day!')),
         );
       }
     }
@@ -198,6 +198,48 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
     if (parts == null || parts.isEmpty) return null;
     final firstPart = parts.first as Map<String, dynamic>?;
     return firstPart?['text'] as String?;
+  }
+
+  /// Gemini can return the response as plain text JSON or as a function call
+  /// when a response schema is provided. Handle both so we always surface the
+  /// food items in the dialog.
+  List<dynamic> _extractFoodItemsFromResponse(Map<String, dynamic> data) {
+    final candidates = data['candidates'];
+    if (candidates is! List || candidates.isEmpty) return [];
+    final first = candidates.first;
+    if (first is! Map<String, dynamic>) return [];
+
+    final content = first['content'];
+    if (content is Map<String, dynamic>) {
+      final parts = content['parts'];
+      if (parts is List && parts.isNotEmpty) {
+        final part = parts.first;
+        if (part is Map<String, dynamic>) {
+          final fnCall = part['functionCall'];
+          if (fnCall is Map<String, dynamic>) {
+            final args = fnCall['args'];
+            if (args is Map<String, dynamic>) {
+              final items = args['items'];
+              if (items is List) return items;
+            }
+          }
+          final text = part['text'];
+          if (text is String) {
+            final parsed = _parseFoodItems(text);
+            if (parsed.isNotEmpty) return parsed;
+          }
+        }
+      }
+    }
+
+    final textFallback = _extractGeminiText(first);
+    return textFallback == null ? [] : _parseFoodItems(textFallback);
+  }
+
+  double _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0;
+    return 0;
   }
 
   void _showFoodSearchDialog(List<_FoodItem> mealList, String mealType) {
@@ -304,19 +346,21 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
 
                   final data = jsonDecode(response.body) as Map<String, dynamic>;
                   final candidates = data['candidates'] as List?;
-                  final String? content =
-                      (candidates != null && candidates.isNotEmpty)
-                          ? _extractGeminiText(candidates.first)
-                          : null;
+                  final itemsFromResponse = _extractFoodItemsFromResponse(data);
+                  final String? rawContent = (candidates != null && candidates.isNotEmpty && candidates.first is Map<String, dynamic>)
+                      ? _extractGeminiText(candidates.first as Map<String, dynamic>)
+                      : null;
                   try {
-                    debugPrint('Food search extracted content: ${content ?? '<null>'}');
+                    debugPrint('Food search extracted content: ${rawContent ?? '<null>'}');
                   } catch (_) {}
 
-                  // Try to parse items from the model text content. If that fails,
-                  // attempt more permissive parsing from the raw response body.
+                  // Prefer structured extraction from the response when available,
+                  // otherwise parse text content, then fall back to parsing the raw body.
                   List<dynamic> parsedItems = [];
-                  if (content != null) {
-                    parsedItems = _parseFoodItems(content);
+                  if (itemsFromResponse.isNotEmpty) {
+                    parsedItems = itemsFromResponse;
+                  } else if (rawContent != null) {
+                    parsedItems = _parseFoodItems(rawContent);
                   }
 
                   if (parsedItems.isEmpty) {
@@ -345,7 +389,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
                     setStateDialog(() {
                       results = [];
                       errorMessage =
-                          'No items returned from the nutrition response.\nFinish reason: $finishReason\nRaw reply: ${content ?? jsonEncode(data)}';
+                          'No items returned from the nutrition response.\nFinish reason: $finishReason\nRaw reply: ${rawContent ?? jsonEncode(data)}';
                       isLoading = false;
                     });
                   } else {
@@ -378,93 +422,91 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
 
             return AlertDialog(
               title: Text('Search $mealType food'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: searchController,
-                    decoration: const InputDecoration(
-                      hintText: 'Search meals...',
-                      prefixIcon: Icon(Icons.search),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: searchController,
+                      decoration: const InputDecoration(
+                        hintText: 'Search meals...',
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (text) => performSearch(text),
+                      onChanged: (text) {
+                        // You can debounce this in the future if you want.
+                      },
                     ),
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (text) => performSearch(text),
-                    onChanged: (text) {
-                      // You can debounce this in the future if you want.
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  if (isLoading) const CircularProgressIndicator(),
-                  if (!isLoading && errorMessage != null) ...[
-                    Text(
-                      errorMessage!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
+                    const SizedBox(height: 12),
+                    if (isLoading) const CircularProgressIndicator(),
+                    if (!isLoading && errorMessage != null) ...[
+                      Text(
+                        errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (!isLoading && results.isEmpty && errorMessage == null)
+                      const Text(
+                        'Type a food name and press search.',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     const SizedBox(height: 8),
-                  ],
-                  if (!isLoading && results.isEmpty && errorMessage == null)
-                    const Text(
-                      'Type a food name and press search.',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  const SizedBox(height: 8),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.of(dialogContext).size.height * 0.6,
-                    ),
-                    child: results.isEmpty
-                        ? const SizedBox.shrink()
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: results.length,
-                            itemBuilder: (context, index) {
-                               final item =
-                                   results[index] as Map<String, dynamic>;
-                               final String name =
-                                   (item['name'] ?? 'Unknown food') as String;
-                               final double calories =
-                                   (item['calories'] as num?)?.toDouble() ?? 0;
-                               final double protein =
-                                   (item['protein_g'] as num?)?.toDouble() ?? 0;
-                               final double carbs =
-                                   (item['carbohydrates_total_g'] as num?)?.toDouble() ?? 0;
-                                 final double fat =
-                                   (item['fat_total_g'] as num?)?.toDouble() ??
-                                       0;
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(dialogContext).size.height * 0.6,
+                      ),
+                      child: results.isEmpty
+                          ? const SizedBox.shrink()
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: results.length,
+                              itemBuilder: (context, index) {
+                                 final rawItem = results[index];
+                                 final Map<String, dynamic> item = rawItem is Map<String, dynamic> ? rawItem : {};
+                                 final String name =
+                                     (item['name'] ?? 'Unknown food').toString();
+                                 final double calories = _asDouble(item['calories']);
+                                 final double protein = _asDouble(item['protein_g']);
+                                 final double carbs = _asDouble(item['carbohydrates_total_g']);
+                                 final double fat = _asDouble(item['fat_total_g']);
 
-                               return ListTile(
-                                 leading: CircleAvatar(
-                                   child: Text(
-                                     name.isNotEmpty
-                                         ? name[0].toUpperCase()
-                                         : '?',
+                                 return ListTile(
+                                   leading: CircleAvatar(
+                                     child: Text(
+                                       name.isNotEmpty
+                                           ? name[0].toUpperCase()
+                                           : '?',
+                                     ),
                                    ),
-                                 ),
-                                 title: Text(
-                                     '$name (${calories.toStringAsFixed(0)} cal)'),
-                                 subtitle: Text(
-                                   'P: ${protein.toStringAsFixed(1)}g · C: ${carbs.toStringAsFixed(1)}g · F: ${fat.toStringAsFixed(1)}g',
-                                 ),
-                                 onTap: () async {
-                                   final entry = _FoodItem(
-                                     name: name,
-                                     calories: calories,
-                                     protein: protein,
-                                     carbs: carbs,
-                                     fat: fat,
-                                   );
-                                   setState(() {
-                                     mealList.add(entry);
-                                   });
-                                   _updateMacroTotals();
-                                   Navigator.of(dialogContext).pop();
-                                   await _maybeNotifyWhenComplete();
-                                 },
-                               );
-                             },
-                          ),
-                  ),
-                ],
+                                   title: Text(
+                                       '$name (${calories.toStringAsFixed(0)} cal)'),
+                                   subtitle: Text(
+                                     'P: ${protein.toStringAsFixed(1)}g · C: ${carbs.toStringAsFixed(1)}g · F: ${fat.toStringAsFixed(1)}g',
+                                   ),
+                                   onTap: () async {
+                                     final entry = _FoodItem(
+                                       name: name,
+                                       calories: calories,
+                                       protein: protein,
+                                       carbs: carbs,
+                                       fat: fat,
+                                     );
+                                     setState(() {
+                                       mealList.add(entry);
+                                     });
+                                     _updateMacroTotals();
+                                     Navigator.of(dialogContext).pop();
+                                     await _maybeNotifyWhenComplete();
+                                   },
+                                 );
+                               },
+                            ),
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -520,15 +562,16 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
     return _plans.putIfAbsent(key, () => _DayPlan());
   }
 
-  void _updateMacroTotals() {
-    final plan = _currentPlan;
-    final items = <_FoodItem>[...plan.breakfast, ...plan.lunch, ...plan.dinner, ...plan.snack];
-
+  MacroTotals _totalsForPlan(_DayPlan plan) {
     MacroTotals totals = MacroTotals.empty;
-    for (final item in items) {
+    for (final item in [...plan.breakfast, ...plan.lunch, ...plan.dinner, ...plan.snack]) {
       totals = totals + item.macros;
     }
+    return totals;
+  }
 
+  void _updateMacroTotals() {
+    final totals = _totalsForPlan(_currentPlan);
     MacroTracker.instance.setTotalsForDate(_selectedDate, totals);
   }
 
@@ -787,6 +830,54 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
     );
   }
 
+  Widget _buildTotalsCard() {
+    final totals = _totalsForPlan(_currentPlan);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12.0),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Today\'s Macros', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Calories', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
+                Text('${totals.calories.toStringAsFixed(0)} kcal', style: const TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Protein', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
+                Text('${totals.protein.toStringAsFixed(1)} g', style: const TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Carbs', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
+                Text('${totals.carbs.toStringAsFixed(1)} g', style: const TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Fat', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
+                Text('${totals.fat.toStringAsFixed(1)} g', style: const TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -821,6 +912,8 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
               const SizedBox(height: 12),
               // Insert the weight card here so it visually matches the meal cards
               _buildWeightCard(),
+              const SizedBox(height: 12),
+              _buildTotalsCard(),
               const SizedBox(height: 12),
               _buildMealSection(
                 'Breakfast',
