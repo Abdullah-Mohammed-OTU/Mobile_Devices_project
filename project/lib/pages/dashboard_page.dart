@@ -617,7 +617,7 @@ class _DashboardPageState extends State<DashboardPage> {
               unitLabel = 'lbs';
             }
             final sign = displayDelta >= 0 ? '+' : '';
-            trendText = '${sign}${displayDelta.toStringAsFixed(1)} $unitLabel over ${days}d';
+            trendText = '$sign${displayDelta.toStringAsFixed(1)} $unitLabel over ${days}d';
             trendColor = displayDelta < 0 ? Colors.green : (displayDelta > 0 ? Colors.red : Colors.grey);
           }
 
@@ -662,7 +662,6 @@ class _DashboardPageState extends State<DashboardPage> {
     return Scaffold(
       body: ReorderableListView(
         padding: const EdgeInsets.all(16),
-        children: List.generate(_cardOrder.length, (i) => buildCard(i, _cardOrder[i])),
         onReorder: (oldIndex, newIndex) {
           setState(() {
             // Prevent the 'goal' card from being moved — keep it locked at index 0.
@@ -679,6 +678,7 @@ class _DashboardPageState extends State<DashboardPage> {
         },
         // Use buildDefaultDragHandles=false to require explicit drag handles.
         buildDefaultDragHandles: false,
+        children: List.generate(_cardOrder.length, (i) => buildCard(i, _cardOrder[i])),
       ),
     );
   }
@@ -732,7 +732,11 @@ class _SparklinePainter extends CustomPainter {
       final x = dx * i;
       final norm = (values[i] - minV) / range;
       final y = size.height - (norm * size.height);
-      if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
     }
 
     // draw filled area under curve

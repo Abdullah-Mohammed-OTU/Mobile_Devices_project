@@ -89,7 +89,7 @@ class WorkoutsPageState extends State<WorkoutsPage> {
         await WorkoutDB.addWorkout(name, sets, reps, weight);
         final displayUnit = _weightUnit;
         final displayWeight = (displayUnit == 'kg') ? weight : (weight * 2.2046226218);
-        saved.add("${name}: ${sets}x${reps} @ ${displayWeight.toStringAsFixed(1)}${displayUnit == 'kg' ? 'kg' : 'lbs'}");
+        saved.add("$name: ${sets}x$reps @ ${displayWeight.toStringAsFixed(1)}${displayUnit == 'kg' ? 'kg' : 'lbs'}");
         inserted++;
       } catch (e, st) {
         debugPrint('Failed reusing recent workout entry: $e');
@@ -98,7 +98,7 @@ class WorkoutsPageState extends State<WorkoutsPage> {
     }
     if (inserted > 0) setState(() {});
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Reused ${inserted} exercises from recent workout')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Reused $inserted exercises from recent workout')));
     }
   }
 
@@ -147,7 +147,7 @@ class WorkoutsPageState extends State<WorkoutsPage> {
         await WorkoutDB.addWorkout(name, sets, reps, weight);
         final displayUnit = _weightUnit;
         final displayWeight = (displayUnit == 'kg') ? weight : (weight * 2.2046226218);
-        saved.add("${name}: ${sets}x${reps} @ ${displayWeight.toStringAsFixed(1)}${displayUnit == 'kg' ? 'kg' : 'lbs'}");
+        saved.add("$name: ${sets}x$reps @ ${displayWeight.toStringAsFixed(1)}${displayUnit == 'kg' ? 'kg' : 'lbs'}");
         inserted++;
       } catch (err, st) {
         debugPrint('Error logging session entry: $err');
@@ -249,7 +249,7 @@ class WorkoutsPageState extends State<WorkoutsPage> {
                   Navigator.pop(context);
                 },
               );
-            }).toList(),
+            }),
           ],
         );
       },
@@ -548,7 +548,7 @@ class WorkoutsPageState extends State<WorkoutsPage> {
                             final e = currentSession[i];
                             return ListTile(
                               title: Text('${e['name']}'),
-                              subtitle: Text('${e['sets']}x${e['reps']} @ ${(_weightUnit == 'kg' ? e['weight'] : (e['weight'] * 2.2046226218)).toStringAsFixed(1)} ${_weightUnit}'),
+                              subtitle: Text('${e['sets']}x${e['reps']} @ ${(_weightUnit == 'kg' ? e['weight'] : (e['weight'] * 2.2046226218)).toStringAsFixed(1)} $_weightUnit'),
                               trailing: IconButton(icon: const Icon(Icons.delete), onPressed: () => _removeFromSession(i)),
                             );
                           }),

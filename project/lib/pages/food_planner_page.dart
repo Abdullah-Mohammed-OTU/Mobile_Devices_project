@@ -493,11 +493,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
 
   void _updateMacroTotals() {
     final plan = _currentPlan;
-    final items = <_FoodItem>[]
-      ..addAll(plan.breakfast)
-      ..addAll(plan.lunch)
-      ..addAll(plan.dinner)
-      ..addAll(plan.snack);
+    final items = <_FoodItem>[...plan.breakfast, ...plan.lunch, ...plan.dinner, ...plan.snack];
 
     MacroTotals totals = MacroTotals.empty;
     for (final item in items) {
@@ -560,7 +556,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
             final delta = last - first;
             final days = DateTime.parse(recent.last.key).difference(DateTime.parse(recent.first.key)).inDays;
             final sign = delta >= 0 ? '+' : '';
-            weightSummaryBuf.writeln('Trend: ${sign}${delta.toStringAsFixed(1)} kg over ${days} days.');
+            weightSummaryBuf.writeln('Trend: $sign${delta.toStringAsFixed(1)} kg over $days days.');
           }
         } else if (_userWeightKg > 0) {
           weightSummaryBuf.writeln('User current weight: ${_userWeightKg.toStringAsFixed(1)} kg');
@@ -600,7 +596,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
               'parts': [
                 {
                   'text':
-                      'Breakfast: ${_currentPlan.breakfast.map((item) => item.label).join(', ')}\nLunch: ${_currentPlan.lunch.map((item) => item.label).join(', ')}\nDinner: ${_currentPlan.dinner.map((item) => item.label).join(', ')}\nSnack: ${_currentPlan.snack.map((item) => item.label).join(', ')}\n\n${weightSummaryBuf.toString()}' + (userGoal != null && userGoal.isNotEmpty ? '\nUser goal: $userGoal' : '')
+                      'Breakfast: ${_currentPlan.breakfast.map((item) => item.label).join(', ')}\nLunch: ${_currentPlan.lunch.map((item) => item.label).join(', ')}\nDinner: ${_currentPlan.dinner.map((item) => item.label).join(', ')}\nSnack: ${_currentPlan.snack.map((item) => item.label).join(', ')}\n\n${weightSummaryBuf.toString()}${userGoal != null && userGoal.isNotEmpty ? '\nUser goal: $userGoal' : ''}'
                 },
               ],
             },
@@ -723,7 +719,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
               unitLabel = 'lbs';
             }
             final sign = displayDelta >= 0 ? '+' : '';
-            trendText = 'Trend: ${sign}${displayDelta.toStringAsFixed(1)} $unitLabel over ${days}d';
+            trendText = 'Trend: $sign${displayDelta.toStringAsFixed(1)} $unitLabel over ${days}d';
             trendColor = displayDelta < 0 ? Colors.green : (displayDelta > 0 ? Colors.red : Colors.grey);
           }
         }
