@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/notifications_service.dart';
 import '../services/macro_tracker.dart';
+import '../main.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key, this.onLogout});
@@ -52,6 +53,11 @@ class _SettingsPageState extends State<SettingsPage> {
       _notificationsEnabled = value;
     });
     await NotificationService.instance.setEnabled(value);
+  }
+
+  Future<void> _setThemeMode(ThemeMode mode) async {
+    await ThemeNotifier.instance.setMode(mode);
+    setState(() {});
   }
 
   Future<void> _insertFakeWeek() async {
@@ -166,6 +172,29 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    title: const Text('Theme'),
+                    subtitle: Text(ThemeNotifier.instance.mode == ThemeMode.dark ? 'Dark' : 'Light'),
+                  ),
+                  Row(children: [
+                    Expanded(
+                      child: RadioListTile<ThemeMode>(
+                        title: const Text('Light'),
+                        value: ThemeMode.light,
+                        groupValue: ThemeNotifier.instance.mode,
+                        onChanged: (m) => _setThemeMode(m ?? ThemeMode.light),
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<ThemeMode>(
+                        title: const Text('Dark'),
+                        value: ThemeMode.dark,
+                        groupValue: ThemeNotifier.instance.mode,
+                        onChanged: (m) => _setThemeMode(m ?? ThemeMode.dark),
+                      ),
+                    ),
+                  ]),
                 ],
               ),
             ),

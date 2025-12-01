@@ -562,6 +562,15 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
         // ignore any errors building the summary
       }
 
+      // include user's goal from dashboard if available
+      String? userGoal;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        userGoal = prefs.getString('dashboard_goal');
+      } catch (e) {
+        userGoal = null;
+      }
+
       final response = await http.post(
         uri,
         headers: {
@@ -583,7 +592,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
               'parts': [
                 {
                   'text':
-                      'Breakfast: ${_currentPlan.breakfast.map((item) => item.label).join(', ')}\nLunch: ${_currentPlan.lunch.map((item) => item.label).join(', ')}\nDinner: ${_currentPlan.dinner.map((item) => item.label).join(', ')}\nSnack: ${_currentPlan.snack.map((item) => item.label).join(', ')}\n\n${_weightSummaryBuf.toString()}'
+                      'Breakfast: ${_currentPlan.breakfast.map((item) => item.label).join(', ')}\nLunch: ${_currentPlan.lunch.map((item) => item.label).join(', ')}\nDinner: ${_currentPlan.dinner.map((item) => item.label).join(', ')}\nSnack: ${_currentPlan.snack.map((item) => item.label).join(', ')}\n\n${_weightSummaryBuf.toString()}' + (userGoal != null && userGoal.isNotEmpty ? '\nUser goal: $userGoal' : '')
                 },
               ],
             },
@@ -653,7 +662,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
             ),
             const SizedBox(height: 8),
             mealList.isEmpty
-                ? const Text('No items', style: TextStyle(color: Colors.black54))
+              ? Text('No items', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65)))
                 : Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -730,7 +739,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
                 Text(display, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                 if (trendText != null) ...[
                   const SizedBox(height: 6),
-                  Text(trendText, style: TextStyle(fontSize: 12, color: trendColor ?? Colors.black54)),
+                  Text(trendText, style: TextStyle(fontSize: 12, color: trendColor ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.65))),
                 ],
               ],
             ),

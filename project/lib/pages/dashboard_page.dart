@@ -392,7 +392,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             Builder(builder: (ctx) {
                               final yesterday = _formatDate(_startOfToday().subtract(const Duration(days: 1)));
                               final ySteps = _stepsHistory.containsKey(yesterday) ? _stepsHistory[yesterday] : 0;
-                              return Text('Yesterday: ${ySteps ?? 0} steps', style: const TextStyle(fontSize: 12, color: Colors.black54));
+                              return Text('Yesterday: ${ySteps ?? 0} steps', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65)));
                             }),
                           ],
                         ),
@@ -497,19 +497,19 @@ class _DashboardPageState extends State<DashboardPage> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 // In label
-                                Expanded(flex: 3, child: Center(child: const Text('In', style: TextStyle(fontSize: 12, color: Colors.black54)))),
+                                Expanded(flex: 3, child: Center(child: Text('In', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65))))),
                                 const SizedBox(width: 8),
                                 // spacer for operator
                                 SizedBox(width: 28, child: Container()),
                                 const SizedBox(width: 8),
                                 // Out label
-                                Expanded(flex: 3, child: Center(child: const Text('Out', style: TextStyle(fontSize: 12, color: Colors.black54)))),
+                                Expanded(flex: 3, child: Center(child: Text('Out', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65))))),
                                 const SizedBox(width: 8),
                                 // spacer for operator
                                 SizedBox(width: 28, child: Container()),
                                 const SizedBox(width: 8),
                                 // Net label
-                                Expanded(flex: 3, child: Center(child: const Text('Net', style: TextStyle(fontSize: 12, color: Colors.black54)))),
+                                Expanded(flex: 3, child: Center(child: Text('Net', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65))))),
                               ],
                             ),
                           ),

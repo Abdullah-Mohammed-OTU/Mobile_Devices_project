@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/workouts_page.dart';
 import 'pages/food_planner_page.dart';
@@ -21,7 +22,45 @@ void navigateToBottomTab(int index) {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.instance.init();
+  // load theme preference before running the app
+  await ThemeNotifier.instance.load();
   runApp(const MyApp());
+}
+
+class ThemeNotifier extends ChangeNotifier {
+  ThemeNotifier._();
+  static final ThemeNotifier instance = ThemeNotifier._();
+
+  ThemeMode _mode = ThemeMode.light;
+
+  ThemeMode get mode => _mode;
+
+  Future<void> load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final s = prefs.getString('theme_mode') ?? 'light';
+      if (s == 'dark') {
+        _mode = ThemeMode.dark;
+      } else if (s == 'system') {
+        _mode = ThemeMode.system;
+      } else {
+        _mode = ThemeMode.light;
+      }
+    } catch (e) {
+      _mode = ThemeMode.light;
+    }
+    notifyListeners();
+  }
+
+  Future<void> setMode(ThemeMode m) async {
+    _mode = m;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final s = (m == ThemeMode.dark) ? 'dark' : (m == ThemeMode.system) ? 'system' : 'light';
+      await prefs.setString('theme_mode', s);
+    } catch (e) {}
+    notifyListeners();
+  }
 }
 
 class MyApp extends StatefulWidget {
@@ -33,6 +72,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String? _token;
+  late VoidCallback _themeListener;
 
   void _handleLogin(String token) {
     setState(() => _token = token);
@@ -75,10 +115,48 @@ class _MyAppState extends State<MyApp> {
         ),
         textTheme: ThemeData.light().textTheme.apply(bodyColor: Colors.black87),
       ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple, brightness: Brightness.dark),
+        scaffoldBackgroundColor: Colors.black,
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          filled: true,
+          fillColor: Colors.grey[850],
+          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+        cardTheme: CardThemeData(
+          color: Colors.grey[900],
+          elevation: 2,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+      themeMode: ThemeNotifier.instance.mode,
         home: _token == null
           ? LoginPage(onLoginSuccess: _handleLogin)
           : MainPage(key: mainPageKey, token: _token!, onLogout: _handleLogout),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _themeListener = () => setState(() {});
+    ThemeNotifier.instance.addListener(_themeListener);
+  }
+
+  @override
+  void dispose() {
+    ThemeNotifier.instance.removeListener(_themeListener);
+    super.dispose();
   }
 }
 
