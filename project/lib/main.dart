@@ -127,8 +127,8 @@ class _MainPageState extends State<MainPage> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(icon: Icon(Icons.fitness_center), label: 'Workouts'),
-          BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu), label: 'Food Planner'),
-          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Social Feed'),
+          BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu), label: 'Diet'),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Social'),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
         ],
       ),

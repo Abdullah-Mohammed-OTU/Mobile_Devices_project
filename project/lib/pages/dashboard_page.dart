@@ -30,6 +30,18 @@ class _DashboardPageState extends State<DashboardPage> {
   // weight history for dashboard card
   Map<String, double> _weightHistory = {};
   String _weightUnit = 'kg';
+  // steps history per day (YYYY-MM-DD -> steps)
+  Map<String, int> _stepsHistory = {};
+  // user goal
+  String _goal = '';
+  final List<String> _goalOptions = [
+    'Lose weight',
+    'Maintain weight',
+    'Gain muscle',
+    'Increase endurance',
+    'Improve flexibility',
+    'General fitness',
+  ];
 
   @override
   void initState() {
@@ -46,6 +58,63 @@ class _DashboardPageState extends State<DashboardPage> {
     _loadCardOrder();
     _loadWorkoutCalories();
     _loadWeightHistory();
+    _loadGoal();
+    _loadStepsHistory();
+  }
+
+  Future<void> _loadStepsHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('steps_history');
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
+        final map = <String, int>{};
+        decoded.forEach((k, v) {
+          map[k] = (v is int) ? v : int.tryParse('$v') ?? 0;
+        });
+        setState(() {
+          _stepsHistory = map;
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  Future<void> _saveStepsHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('steps_history', jsonEncode(_stepsHistory));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  Future<void> _loadGoal() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('dashboard_goal');
+      setState(() {
+        if (saved != null && saved.isNotEmpty) {
+          _goal = saved;
+        } else {
+          _goal = _goalOptions[1]; // default to 'Maintain weight'
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _goal = _goalOptions[1];
+      });
+    }
+  }
+
+  Future<void> _saveGoal(String g) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('dashboard_goal', g);
+    } catch (e) {
+      // ignore
+    }
   }
 
   Future<void> _loadWeightHistory() async {
@@ -130,7 +199,7 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  void _stopTracking() {
+  Future<void> _stopTracking() async {
     _accSub?.cancel();
     _accSub = null;
     _gyroSub?.cancel();
@@ -139,6 +208,15 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       _isTracking = false;
     });
+
+    // save today's steps into history
+    try {
+      final key = _formatDate(_startOfToday());
+      _stepsHistory[key] = _steps;
+      await _saveStepsHistory();
+    } catch (e) {
+      // ignore
+    }
 
     showDialog(
       context: context,
@@ -210,20 +288,27 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getStringList('dashboard_card_order');
+      final defaultCards = ['goal', 'steps', 'macros', 'calories', 'weight_history'];
       if (saved != null && saved.isNotEmpty) {
-        // validate keys
-        final valid = ['steps', 'macros', 'calories', 'weight_history'];
-        final filtered = saved.where((s) => valid.contains(s)).toList();
-        if (filtered.isNotEmpty) {
-          setState(() {
-            _cardOrder = filtered;
-          });
+        // keep user's saved order for known cards, but ensure all defaults exist
+        final filtered = saved.where((s) => defaultCards.contains(s)).toList();
+        final merged = <String>[];
+        for (final s in filtered) {
+          if (!merged.contains(s)) merged.add(s);
         }
-      }
-      // ensure weight_history card is present by default
-      if (!_cardOrder.contains('weight_history')) {
+        // Ensure 'goal' is at the top by default if user didn't include it
+        if (!merged.contains('goal')) merged.insert(0, 'goal');
+        // Append any remaining default cards (except 'goal' which we've already ensured)
+        for (final d in defaultCards) {
+          if (d == 'goal') continue;
+          if (!merged.contains(d)) merged.add(d);
+        }
         setState(() {
-          _cardOrder.add('weight_history');
+          _cardOrder = merged;
+        });
+      } else {
+        setState(() {
+          _cardOrder = List<String>.from(defaultCards);
         });
       }
     } catch (e) {
@@ -246,6 +331,35 @@ class _DashboardPageState extends State<DashboardPage> {
 
     Widget buildCard(int index, String id) {
       switch (id) {
+        case 'goal':
+          return Card(
+            key: ValueKey(id),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(child: ReorderableDragStartListener(index: index, child: const Icon(Icons.drag_handle))),
+                  const SizedBox(height: 8),
+                  const Text('My goal is:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  DropdownButton<String>(
+                    value: _goal.isNotEmpty ? _goal : null,
+                    hint: const Text('Select a goal'),
+                    isExpanded: true,
+                    items: _goalOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                    onChanged: (val) {
+                      if (val == null) return;
+                      setState(() {
+                        _goal = val;
+                      });
+                      _saveGoal(val);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
         case 'steps':
           return Card(
             key: ValueKey(id),
@@ -262,11 +376,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       child: const Icon(Icons.drag_handle),
                     ),
                   ),
-                  if (_workoutCalories > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Center(child: Text('Includes ${_workoutCalories.toStringAsFixed(0)} kcal from workouts', style: const TextStyle(fontSize: 12, color: Colors.black54))),
-                    ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -279,6 +388,12 @@ class _DashboardPageState extends State<DashboardPage> {
                             Text('$_steps', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 6),
                             if (_isTracking) const Text('(tracking)', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+                            const SizedBox(height: 6),
+                            Builder(builder: (ctx) {
+                              final yesterday = _formatDate(_startOfToday().subtract(const Duration(days: 1)));
+                              final ySteps = _stepsHistory.containsKey(yesterday) ? _stepsHistory[yesterday] : 0;
+                              return Text('Yesterday: ${ySteps ?? 0} steps', style: const TextStyle(fontSize: 12, color: Colors.black54));
+                            }),
                           ],
                         ),
                       ),
@@ -539,8 +654,8 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // order of dashboard cards (keys like 'steps','macros','calories')
-  List<String> _cardOrder = ['steps', 'macros', 'calories'];
+  // order of dashboard cards (keys like 'goal','steps','macros','calories')
+  List<String> _cardOrder = ['goal', 'steps', 'macros', 'calories'];
 }
 
 // Simple sparkline widget for weight values.

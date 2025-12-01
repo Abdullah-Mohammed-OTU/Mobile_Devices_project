@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/notifications_service.dart';
+import '../services/macro_tracker.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key, this.onLogout});
@@ -84,6 +85,30 @@ class _SettingsPageState extends State<SettingsPage> {
       final todaysKey = '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
       final todaysWeight = map[todaysKey] ?? base;
       await prefs.setDouble('user_weight_kg', todaysWeight);
+
+      // Insert sample food totals for today into the MacroTracker (in-memory)
+      try {
+        final today = DateTime.now();
+        // sample daily macros
+        final sampleTotals = MacroTotals(calories: 2200, protein: 110, carbs: 260, fat: 70);
+        MacroTracker.instance.setTotalsForDate(today, sampleTotals);
+      } catch (e) {
+        // ignore
+      }
+
+      // Insert sample steps for today and yesterday into SharedPreferences
+      try {
+        final today = DateTime.now();
+        final yesterday = today.subtract(const Duration(days: 1));
+        String fmt(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+        final stepsMap = <String, int>{
+          fmt(yesterday): 6200,
+          fmt(today): 8400,
+        };
+        await prefs.setString('steps_history', jsonEncode(stepsMap));
+      } catch (e) {
+        // ignore
+      }
 
       if (mounted) {
         setState(() {
