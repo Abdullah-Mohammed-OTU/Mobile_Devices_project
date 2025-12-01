@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/macro_tracker.dart';
 
@@ -32,6 +33,7 @@ class _DashboardPageState extends State<DashboardPage> {
       });
     };
     MacroTracker.instance.addListener(_macroListener);
+    _loadCardOrder();
   }
 
   StreamSubscription<AccelerometerEvent>? _accSub;
@@ -147,92 +149,195 @@ class _DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
+  Future<void> _loadCardOrder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getStringList('dashboard_card_order');
+      if (saved != null && saved.isNotEmpty) {
+        // validate keys
+        final valid = ['steps', 'macros', 'calories'];
+        final filtered = saved.where((s) => valid.contains(s)).toList();
+        if (filtered.isNotEmpty) {
+          setState(() {
+            _cardOrder = filtered;
+          });
+        }
+      }
+    } catch (e) {
+      // ignore loading errors, keep default order
+    }
+  }
+
+  Future<void> _saveCardOrder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('dashboard_card_order', _cardOrder);
+    } catch (e) {
+      // ignore save errors
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Today: ${_formatDate(_todayDate)}',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Steps', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 8),
-                          Text('$_steps', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 6),
-                          if (_isTracking)
-                            const Text('(tracking)', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
-                        ],
+    // Reorderable list: maintain order of cards in state so users can drag to reorder
+
+    Widget buildCard(int index, String id) {
+      switch (id) {
+        case 'steps':
+          return Card(
+            key: ValueKey(id),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: ReorderableDragStartListener(
+                      index: index,
+                      child: const Icon(Icons.drag_handle),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Steps', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 8),
+                            Text('$_steps', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 6),
+                            if (_isTracking) const Text('(tracking)', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+                          ],
+                        ),
                       ),
-                    ),
-                    ElevatedButton(
-                      onPressed: _toggleTracking,
-                      child: Text(_isTracking ? 'Stop' : 'Start'),
-                    ),
-                  ],
-                ),
+                      ElevatedButton(
+                        onPressed: _toggleTracking,
+                        child: Text(_isTracking ? 'Stop' : 'Start'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("Today's macros", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Calories', style: const TextStyle(fontWeight: FontWeight.w600)),
-                        Text('${_todayTotals.calories.toStringAsFixed(0)} cal'),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Protein', style: const TextStyle(fontWeight: FontWeight.w600)),
-                        Text('${_todayTotals.protein.toStringAsFixed(1)} g'),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Carbs', style: const TextStyle(fontWeight: FontWeight.w600)),
-                        Text('${_todayTotals.carbs.toStringAsFixed(1)} g'),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Fat', style: const TextStyle(fontWeight: FontWeight.w600)),
-                        Text('${_todayTotals.fat.toStringAsFixed(1)} g'),
-                      ],
-                    ),
-                  ],
-                ),
+          );
+        case 'macros':
+          return Card(
+            key: ValueKey(id),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: ReorderableDragStartListener(index: index, child: const Icon(Icons.drag_handle)),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text("Today's macros", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Calories', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text('${_todayTotals.calories.toStringAsFixed(0)} cal'),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Protein', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text('${_todayTotals.protein.toStringAsFixed(1)} g'),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Carbs', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text('${_todayTotals.carbs.toStringAsFixed(1)} g'),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Fat', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text('${_todayTotals.fat.toStringAsFixed(1)} g'),
+                    ],
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          );
+        case 'calories':
+          final caloriesIn = _todayTotals.calories;
+          final caloriesOut = _steps * 0.04;
+          final net = caloriesIn - caloriesOut;
+          return Card(
+            key: ValueKey(id),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: ReorderableDragStartListener(index: index, child: const Icon(Icons.drag_handle)),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('Calories (In / Out)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Calories In', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text('${caloriesIn.toStringAsFixed(0)} cal'),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Calories Out (est.)', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text('${caloriesOut.toStringAsFixed(0)} cal'),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Net', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text('${net.toStringAsFixed(0)} cal', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: net >= 0 ? Colors.green : Colors.red)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        default:
+          return const SizedBox.shrink();
+      }
+    }
+
+    return Scaffold(
+      body: ReorderableListView(
+        padding: const EdgeInsets.all(16),
+        children: List.generate(_cardOrder.length, (i) => buildCard(i, _cardOrder[i])),
+        onReorder: (oldIndex, newIndex) {
+          setState(() {
+            if (newIndex > oldIndex) newIndex -= 1;
+            final item = _cardOrder.removeAt(oldIndex);
+            _cardOrder.insert(newIndex, item);
+          });
+          _saveCardOrder();
+        },
       ),
     );
   }
+
+  // order of dashboard cards (keys like 'steps','macros','calories')
+  List<String> _cardOrder = ['steps', 'macros', 'calories'];
 }
