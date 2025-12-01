@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../workout_api/exercise_api.dart';
 import '../workout_api/exercise_model.dart';
 import '../workout_api/workout_db.dart';
+import '../services/workout_generator.dart';
 
 class WorkoutsPage extends StatefulWidget {
   const WorkoutsPage({super.key});
@@ -20,6 +21,58 @@ class WorkoutsPageState extends State<WorkoutsPage> {
   List<Map<String, dynamic>> recentWorkouts = [];
   List<Map<String, dynamic>> currentSession = [];
   String _weightUnit = 'kg';
+
+  // NEW: AI plan holder
+  Map<String, dynamic>? plan;
+
+  // NEW: list of all exercise names used by the generator (keeps Choose Workout complete)
+  // Keep in sync with WorkoutGenerator.generate() pools
+  final List<String> aiExerciseNames = [
+    // hypertrophy
+    "Bench Press",
+    "Incline DB Press",
+    "Chest Fly",
+    "Rows",
+    "Lat Pulldown",
+    "Face Pulls",
+    "Shoulder Press",
+    "Lateral Raises",
+    "Rear Delt Fly",
+    "Bicep Curls",
+    "Tricep Extensions",
+    "Squats",
+    "Lunges",
+    "RDL",
+    "Leg Press",
+    "Calf Raises",
+    "Burpees",
+    "Push-ups",
+    "Squat Jumps",
+    "Jump Rope",
+    // strength / variations
+    "Bench (5x5)",
+    "Weighted Pull-up (5x5)",
+    "OHP (5x5)",
+    "Dips",
+    "Squat (5x5)",
+    "Deadlift (3x5)",
+    "Hip Thrusts",
+    "Calves",
+    "Front Squats",
+    "Plyo Lunges",
+    // fat-loss / conditioning
+    "Mountain Climbers",
+    "High Knees",
+    "Planks",
+    // athletic
+    "Power Cleans",
+    "Box Jumps",
+    "Sled Push",
+    "Sprints",
+    "Hanging Leg Raises",
+    "Russian Twists",
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -35,7 +88,8 @@ class WorkoutsPageState extends State<WorkoutsPage> {
       final jsonStr = prefs.getString('recent_workouts');
       if (jsonStr == null) return;
       final decoded = jsonDecode(jsonStr) as List<dynamic>;
-      setState(() => recentWorkouts = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList());
+      setState(() =>
+      recentWorkouts = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList());
     } catch (e, st) {
       debugPrint('Failed loading recent_workouts: $e');
       debugPrint(st.toString());
@@ -217,15 +271,40 @@ class WorkoutsPageState extends State<WorkoutsPage> {
   }
 
   void pickWorkout() {
-    if (apiExercises.isEmpty) {
+    // Build combined list: custom + api + AI exercises (deduped)
+    final combined = <Exercise>[];
+    final seen = <String>{};
+
+    // add custom first
+    for (final ex in customExercises) {
+      if (!seen.contains(ex.name)) {
+        seen.add(ex.name);
+        combined.add(ex);
+      }
+    }
+
+    // add api exercises
+    for (final ex in apiExercises) {
+      if (!seen.contains(ex.name)) {
+        seen.add(ex.name);
+        combined.add(ex);
+      }
+    }
+
+    // add AI-only exercises converted to Exercise objects
+    for (final name in aiExerciseNames) {
+      if (!seen.contains(name)) {
+        seen.add(name);
+        combined.add(Exercise(name: name, instructions: ['No tips available']));
+      }
+    }
+
+    if (combined.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Exercises not loaded yet")),
       );
       return;
     }
-    final combined = <Exercise>[];
-    combined.addAll(customExercises);
-    combined.addAll(apiExercises);
 
     showDialog(
       context: context,
@@ -296,7 +375,7 @@ class WorkoutsPageState extends State<WorkoutsPage> {
             ),
             TextButton(
               child: const Text("Save"),
-                onPressed: () async {
+              onPressed: () async {
                 int? s = int.tryParse(setsC.text);
                 int? r = int.tryParse(repsC.text);
                 double entered = double.tryParse(weightC.text) ?? 0.0;
@@ -418,6 +497,86 @@ class WorkoutsPageState extends State<WorkoutsPage> {
     );
   }
 
+  // ---------- AI popup (Option C) ----------
+  void showAIPopup() {
+    String tempGoal = "hypertrophy";
+    String tempDifficulty = "beginner";
+    int tempDays = 4;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(builder: (ctx, setDlgState) {
+          return AlertDialog(
+            title: const Text("Generate AI Workout"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Goal"),
+                const SizedBox(height: 6),
+                DropdownButton<String>(
+                  value: tempGoal,
+                  items: const [
+                    DropdownMenuItem(value: "hypertrophy", child: Text("Hypertrophy")),
+                    DropdownMenuItem(value: "strength", child: Text("Strength")),
+                    DropdownMenuItem(value: "fat_loss", child: Text("Fat Loss")),
+                    DropdownMenuItem(value: "general_fitness", child: Text("General Fitness")),
+                    DropdownMenuItem(value: "athletic_performance", child: Text("Athletic Performance")),
+                  ],
+                  onChanged: (v) => setDlgState(() => tempGoal = v!),
+                ),
+                const SizedBox(height: 8),
+                const Text("Difficulty"),
+                const SizedBox(height: 6),
+                DropdownButton<String>(
+                  value: tempDifficulty,
+                  items: const [
+                    DropdownMenuItem(value: "beginner", child: Text("Beginner")),
+                    DropdownMenuItem(value: "intermediate", child: Text("Intermediate")),
+                    DropdownMenuItem(value: "advanced", child: Text("Advanced")),
+                  ],
+                  onChanged: (v) => setDlgState(() => tempDifficulty = v!),
+                ),
+                const SizedBox(height: 8),
+                const Text("Days per week"),
+                const SizedBox(height: 6),
+                DropdownButton<int>(
+                  value: tempDays,
+                  items: const [
+                    DropdownMenuItem(value: 3, child: Text("3 days")),
+                    DropdownMenuItem(value: 4, child: Text("4 days")),
+                    DropdownMenuItem(value: 5, child: Text("5 days")),
+                    DropdownMenuItem(value: 6, child: Text("6 days")),
+                  ],
+                  onChanged: (v) => setDlgState(() => tempDays = v!),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                child: const Text("Cancel"),
+                onPressed: () => Navigator.pop(context),
+              ),
+              TextButton(
+                child: const Text("Generate"),
+                onPressed: () {
+                  // generate and close dialog
+                  final result = WorkoutGenerator.generate(
+                    goal: tempGoal,
+                    daysPerWeek: tempDays,
+                    difficulty: tempDifficulty,
+                  );
+                  setState(() => plan = result);
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          );
+        });
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -444,44 +603,44 @@ class WorkoutsPageState extends State<WorkoutsPage> {
                         onPressed: chosen == null
                             ? null
                             : () {
-                                // Open a small dialog to add selected exercise to current session
-                                final setsC = TextEditingController(text: '3');
-                                final repsC = TextEditingController(text: '8');
-                                final weightC = TextEditingController(text: '0');
-                                showDialog(
-                                  context: context,
-                                  builder: (dctx) {
-                                    return AlertDialog(
-                                      title: Text('Add ${chosen!.name} to Session'),
-                                      content: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          TextField(controller: setsC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Sets')),
-                                          TextField(controller: repsC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Reps')),
-                                          TextField(controller: weightC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'Weight (${_weightUnit == 'kg' ? 'kg' : 'lbs'})')),
-                                        ],
-                                      ),
-                                      actions: [
-                                        TextButton(onPressed: () => Navigator.pop(dctx), child: const Text('Cancel')),
-                                        TextButton(
-                                          onPressed: () async {
-                                            final s = int.tryParse(setsC.text) ?? 0;
-                                            final r = int.tryParse(repsC.text) ?? 0;
-                                            double entered = double.tryParse(weightC.text) ?? 0.0;
-                                            double weightKg = entered;
-                                            if (_weightUnit == 'lbs') weightKg = entered * 0.45359237;
-                                            final navigator = Navigator.of(context);
-                                            await _addToSession(s, r, weightKg);
-                                            if (!mounted) return;
-                                            navigator.pop();
-                                          },
-                                          child: const Text('Add'),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              },
+                          // Open a small dialog to add selected exercise to current session
+                          final setsC = TextEditingController(text: '3');
+                          final repsC = TextEditingController(text: '8');
+                          final weightC = TextEditingController(text: '0');
+                          showDialog(
+                            context: context,
+                            builder: (dctx) {
+                              return AlertDialog(
+                                title: Text('Add ${chosen!.name} to Session'),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    TextField(controller: setsC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Sets')),
+                                    TextField(controller: repsC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Reps')),
+                                    TextField(controller: weightC, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'Weight (${_weightUnit == 'kg' ? 'kg' : 'lbs'})')),
+                                  ],
+                                ),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(dctx), child: const Text('Cancel')),
+                                  TextButton(
+                                    onPressed: () async {
+                                      final s = int.tryParse(setsC.text) ?? 0;
+                                      final r = int.tryParse(repsC.text) ?? 0;
+                                      double entered = double.tryParse(weightC.text) ?? 0.0;
+                                      double weightKg = entered;
+                                      if (_weightUnit == 'lbs') weightKg = entered * 0.45359237;
+                                      final navigator = Navigator.of(context);
+                                      await _addToSession(s, r, weightKg);
+                                      if (!mounted) return;
+                                      navigator.pop();
+                                    },
+                                    child: const Text('Add'),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        },
                         icon: const Icon(Icons.playlist_add),
                         label: const Text('Add Selected to Session'),
                       ),
@@ -498,10 +657,92 @@ class WorkoutsPageState extends State<WorkoutsPage> {
                         label: const Text('Show Tips'),
                       ),
                       const SizedBox(height: 12),
+
+                      // ===== NEW: AI button (Option A: inside the main action card) =====
+                      ElevatedButton.icon(
+                        onPressed: showAIPopup,
+                        icon: const Icon(Icons.auto_awesome),
+                        label: const Text('Generate AI Workout Plan'),
+                      ),
+                      const SizedBox(height: 12),
+                      // ===================================================================
+
                     ],
                   ),
                 ),
               ),
+
+              // Show AI plan card (if plan is generated)
+              if (plan != null) ...[
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('AI Workout Plan', style: TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 8),
+                        // show metadata
+                        Text('Goal: ${plan!['goal'] ?? ''} • Difficulty: ${plan!['difficulty'] ?? ''} • Days: ${plan!['days'] ?? ''}'),
+                        const SizedBox(height: 8),
+                        // list days
+                        Column(
+                          children: (plan!['plan'] as List).map<Widget>((day) {
+                            final exercises = (day['exercises'] as List).cast<String>();
+                            return ListTile(
+                              title: Text('${day['day']} — ${day['type']}'),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: exercises.map((e) => Text('• $e')).toList(),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                // Save this plan as a recent workout (flatten plan into exercise entries)
+                                final flat = <Map<String, dynamic>>[];
+                                for (final d in (plan!['plan'] as List)) {
+                                  for (final exStr in (d['exercises'] as List)) {
+                                    // exStr is like "Bench Press — 3 sets x 8-12 reps"
+                                    final parts = exStr.split('—');
+                                    final name = parts[0].trim();
+                                    flat.add({'name': name, 'sets': 0, 'reps': 0, 'weight': 0});
+                                  }
+                                }
+                                _addRecentWorkout(flat);
+                                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Plan saved to Recent Workouts')));
+                              },
+                              child: const Text('Save Plan to Recent'),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () {
+                                // regenerate with same settings if available
+                                try {
+                                  final g = plan!['goal'] as String;
+                                  final d = plan!['difficulty'] as String;
+                                  final days = plan!['days'] as int;
+                                  final newPlan = WorkoutGenerator.generate(goal: g, daysPerWeek: days, difficulty: d);
+                                  setState(() => plan = newPlan);
+                                } catch (_) {
+                                  // fallback: open popup
+                                  showAIPopup();
+                                }
+                              },
+                              child: const Text('Regenerate'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
 
               // Recent saved workouts (reuse)
               if (recentWorkouts.isNotEmpty)
