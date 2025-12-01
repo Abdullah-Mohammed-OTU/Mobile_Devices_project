@@ -35,7 +35,10 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         _weightUnit = u;
       });
-    } catch (e) {}
+    } catch (e, st) {
+      debugPrint('Failed loading weight unit in settings: $e');
+      debugPrint(st.toString());
+    }
   }
 
   Future<void> _setWeightUnit(String unit) async {
@@ -45,7 +48,10 @@ class _SettingsPageState extends State<SettingsPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('weight_unit', unit);
-    } catch (e) {}
+    } catch (e, st) {
+      debugPrint('Failed saving weight unit in settings: $e');
+      debugPrint(st.toString());
+    }
   }
 
   Future<void> _toggleNotifications(bool value) async {
@@ -72,7 +78,10 @@ class _SettingsPageState extends State<SettingsPage> {
             final d = (v is num) ? v.toDouble() : double.tryParse('$v') ?? 0.0;
             map[k] = d;
           });
-        } catch (e) {}
+        } catch (e, st) {
+          debugPrint('Error parsing existing weight_history in fake week insert: $e');
+          debugPrint(st.toString());
+        }
       }
 
       final base = prefs.getDouble('user_weight_kg') ?? 75.0;
@@ -98,8 +107,9 @@ class _SettingsPageState extends State<SettingsPage> {
         // sample daily macros
         final sampleTotals = MacroTotals(calories: 2200, protein: 110, carbs: 260, fat: 70);
         MacroTracker.instance.setTotalsForDate(today, sampleTotals);
-      } catch (e) {
-        // ignore
+      } catch (e, st) {
+        debugPrint('Failed inserting sample MacroTotals: $e');
+        debugPrint(st.toString());
       }
 
       // Insert sample steps for today and yesterday into SharedPreferences
@@ -112,8 +122,9 @@ class _SettingsPageState extends State<SettingsPage> {
           fmt(today): 8400,
         };
         await prefs.setString('steps_history', jsonEncode(stepsMap));
-      } catch (e) {
-        // ignore
+      } catch (e, st) {
+        debugPrint('Failed inserting sample steps_history: $e');
+        debugPrint(st.toString());
       }
 
       if (mounted) {
@@ -122,7 +133,9 @@ class _SettingsPageState extends State<SettingsPage> {
         });
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Inserted sample weight week')));
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('Failed _insertFakeWeek overall: $e');
+      debugPrint(st.toString());
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to insert sample data')));
     }
   }

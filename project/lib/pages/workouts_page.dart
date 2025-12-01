@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/notifications_service.dart';
+// notifications_service not used here
 import '../workout_api/exercise_api.dart';
 import '../workout_api/exercise_model.dart';
 import '../workout_api/workout_db.dart';
@@ -36,14 +36,20 @@ class WorkoutsPageState extends State<WorkoutsPage> {
       if (jsonStr == null) return;
       final decoded = jsonDecode(jsonStr) as List<dynamic>;
       setState(() => recentWorkouts = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList());
-    } catch (e) {}
+    } catch (e, st) {
+      debugPrint('Failed loading recent_workouts: $e');
+      debugPrint(st.toString());
+    }
   }
 
   Future<void> _saveRecentWorkouts() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('recent_workouts', jsonEncode(recentWorkouts));
-    } catch (e) {}
+    } catch (e, st) {
+      debugPrint('Failed saving recent_workouts: $e');
+      debugPrint(st.toString());
+    }
   }
 
   // Add a new recent workout (list of exercise maps), keep only 5 unique entries
@@ -63,7 +69,10 @@ class WorkoutsPageState extends State<WorkoutsPage> {
       if (recentWorkouts.length > 5) recentWorkouts = recentWorkouts.sublist(0, 5);
       await _saveRecentWorkouts();
       setState(() {});
-    } catch (e) {}
+    } catch (e, st) {
+      debugPrint('Error in _addRecentWorkout: $e');
+      debugPrint(st.toString());
+    }
   }
 
   Future<void> _reuseRecentWorkout(int index) async {
@@ -82,16 +91,26 @@ class WorkoutsPageState extends State<WorkoutsPage> {
         final displayWeight = (displayUnit == 'kg') ? weight : (weight * 2.2046226218);
         saved.add("${name}: ${sets}x${reps} @ ${displayWeight.toStringAsFixed(1)}${displayUnit == 'kg' ? 'kg' : 'lbs'}");
         inserted++;
-      } catch (e) {}
+      } catch (e, st) {
+        debugPrint('Failed reusing recent workout entry: $e');
+        debugPrint(st.toString());
+      }
     }
     if (inserted > 0) setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Reused ${inserted} exercises from recent workout')));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Reused ${inserted} exercises from recent workout')));
+    }
   }
 
   Future<void> _deleteRecentWorkout(int index) async {
     if (index < 0 || index >= recentWorkouts.length) return;
     recentWorkouts.removeAt(index);
-    await _saveRecentWorkouts();
+    try {
+      await _saveRecentWorkouts();
+    } catch (e, st) {
+      debugPrint('Failed deleting recent workout: $e');
+      debugPrint(st.toString());
+    }
     setState(() {});
   }
 
@@ -113,7 +132,7 @@ class WorkoutsPageState extends State<WorkoutsPage> {
   Future<void> _saveSession() async {
     if (currentSession.isEmpty) return;
     await _addRecentWorkout(List<Map<String, dynamic>>.from(currentSession));
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Session saved to Recent Workouts')));
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Session saved to Recent Workouts')));
   }
 
   Future<void> _logSession() async {
@@ -130,13 +149,16 @@ class WorkoutsPageState extends State<WorkoutsPage> {
         final displayWeight = (displayUnit == 'kg') ? weight : (weight * 2.2046226218);
         saved.add("${name}: ${sets}x${reps} @ ${displayWeight.toStringAsFixed(1)}${displayUnit == 'kg' ? 'kg' : 'lbs'}");
         inserted++;
-      } catch (err) {}
+      } catch (err, st) {
+        debugPrint('Error logging session entry: $err');
+        debugPrint(st.toString());
+      }
     }
     if (inserted > 0) setState(() {});
     await _addRecentWorkout(List<Map<String, dynamic>>.from(currentSession));
     currentSession.clear();
     setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Logged $inserted exercises from session')));
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Logged $inserted exercises from session')));
   }
 
   Future<void> _loadCustomExercises() async {
@@ -153,8 +175,9 @@ class WorkoutsPageState extends State<WorkoutsPage> {
         return Exercise(name: name, instructions: instr);
       }).toList();
       setState(() => customExercises = list);
-    } catch (e) {
-      // ignore
+    } catch (e, st) {
+      debugPrint('Failed loading custom_exercises: $e');
+      debugPrint(st.toString());
     }
   }
 
@@ -163,8 +186,9 @@ class WorkoutsPageState extends State<WorkoutsPage> {
       final prefs = await SharedPreferences.getInstance();
       final list = customExercises.map((ex) => {'name': ex.name, 'instructions': ex.instructions}).toList();
       await prefs.setString('custom_exercises', jsonEncode(list));
-    } catch (e) {
-      // ignore
+    } catch (e, st) {
+      debugPrint('Failed saving custom_exercises: $e');
+      debugPrint(st.toString());
     }
   }
 
@@ -174,7 +198,10 @@ class WorkoutsPageState extends State<WorkoutsPage> {
       setState(() {
         _weightUnit = prefs.getString('weight_unit') ?? 'kg';
       });
-    } catch (e) {}
+    } catch (e, st) {
+      debugPrint('Failed loading weight_unit: $e');
+      debugPrint(st.toString());
+    }
   }
 
   Future<void> loadApiWorkouts() async {
@@ -183,9 +210,9 @@ class WorkoutsPageState extends State<WorkoutsPage> {
       setState(() {
         apiExercises = list.take(50).toList();
       });
-    }
-    catch (e) {
-      debugPrint("API error");
+    } catch (e, st) {
+      debugPrint("API error: $e");
+      debugPrint(st.toString());
     }
   }
 
@@ -292,8 +319,10 @@ class WorkoutsPageState extends State<WorkoutsPage> {
                   final displayUnit = _weightUnit;
                   saved.add("${chosen!.name}: ${s}x$r @ ${entered.toStringAsFixed(1)}${displayUnit == 'kg' ? 'kg' : 'lbs'}");
                 });
+                final navigator = Navigator.of(context);
                 await _addRecentWorkout([exMap]);
-                Navigator.pop(dialogCtx);
+                if (!mounted) return;
+                navigator.pop();
               },
             ),
           ],
@@ -376,8 +405,10 @@ class WorkoutsPageState extends State<WorkoutsPage> {
                     .toList();
                 final ex = Exercise(name: name, instructions: instrLines);
                 setState(() => customExercises.insert(0, ex));
+                final navigator = Navigator.of(context);
                 await _saveCustomExercises();
-                Navigator.pop(ctx);
+                if (!mounted) return;
+                navigator.pop();
               },
               child: const Text('Save'),
             ),
@@ -439,8 +470,10 @@ class WorkoutsPageState extends State<WorkoutsPage> {
                                             double entered = double.tryParse(weightC.text) ?? 0.0;
                                             double weightKg = entered;
                                             if (_weightUnit == 'lbs') weightKg = entered * 0.45359237;
+                                            final navigator = Navigator.of(context);
                                             await _addToSession(s, r, weightKg);
-                                            Navigator.pop(dctx);
+                                            if (!mounted) return;
+                                            navigator.pop();
                                           },
                                           child: const Text('Add'),
                                         ),

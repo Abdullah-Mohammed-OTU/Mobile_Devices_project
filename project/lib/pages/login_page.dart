@@ -25,7 +25,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _submit() async {
     final formState = Form.of(_formContext);
-    if (!(formState?.validate() ?? false)) {
+    if (!formState.validate()) {
       return;
     }
     setState(() {

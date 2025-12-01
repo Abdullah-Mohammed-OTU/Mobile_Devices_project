@@ -9,13 +9,19 @@ import 'pages/login_page.dart';
 import 'services/notifications_service.dart';
 
 // Global key and helper to allow other widgets to change the selected bottom tab.
-final GlobalKey<_MainPageState> mainPageKey = GlobalKey<_MainPageState>();
+final GlobalKey mainPageKey = GlobalKey();
 
 /// Call to switch the bottom navigation index from other pages.
 void navigateToBottomTab(int index) {
   try {
-    mainPageKey.currentState?.setSelectedIndex(index);
-  } catch (_) {}
+    final s = mainPageKey.currentState;
+    if (s is _MainPageState) {
+      s.setSelectedIndex(index);
+    }
+  } catch (e, st) {
+    debugPrint('navigateToBottomTab error: $e');
+    debugPrint(st.toString());
+  }
 }
 
 
@@ -48,6 +54,7 @@ class ThemeNotifier extends ChangeNotifier {
       }
     } catch (e) {
       _mode = ThemeMode.light;
+      debugPrint('ThemeNotifier.load error: $e');
     }
     notifyListeners();
   }
@@ -58,7 +65,10 @@ class ThemeNotifier extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final s = (m == ThemeMode.dark) ? 'dark' : (m == ThemeMode.system) ? 'system' : 'light';
       await prefs.setString('theme_mode', s);
-    } catch (e) {}
+    } catch (e, st) {
+      debugPrint('ThemeNotifier.setMode save error: $e');
+      debugPrint(st.toString());
+    }
     notifyListeners();
   }
 }

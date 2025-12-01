@@ -85,7 +85,10 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
             final d = (v is num) ? v.toDouble() : double.tryParse('$v') ?? 0.0;
             map[k] = d;
           });
-        } catch (e) {}
+        } catch (e, st) {
+          debugPrint('Failed parsing weight_history in FoodPlanner: $e');
+          debugPrint(st.toString());
+        }
       }
       final defaultKg = prefs.getDouble('user_weight_kg') ?? 0.0;
       setState(() {
@@ -93,8 +96,9 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
         _weightUnit = prefs.getString('weight_unit') ?? 'kg';
         _userWeightKg = _weightHistory[_formatDate(_selectedDate)] ?? defaultKg;
       });
-    } catch (e) {
-      // ignore
+    } catch (e, st) {
+      debugPrint('Failed loading user weight: $e');
+      debugPrint(st.toString());
     }
   }
 
@@ -110,7 +114,10 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
       setState(() {
         _userWeightKg = kg;
       });
-    } catch (e) {}
+    } catch (e, st) {
+      debugPrint('Failed saving user weight: $e');
+      debugPrint(st.toString());
+    }
   }
 
   void _showEditWeightDialog() {
@@ -537,15 +544,15 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
 
     try {
       // Build a brief weight-history summary (up to 7 recent days) to give the AI context.
-      final StringBuffer _weightSummaryBuf = StringBuffer();
+      final StringBuffer weightSummaryBuf = StringBuffer();
       try {
         if (_weightHistory.isNotEmpty) {
           final entries = _weightHistory.entries.toList()
             ..sort((a, b) => a.key.compareTo(b.key));
           final recent = entries.length <= 7 ? entries : entries.sublist(entries.length - 7);
-          _weightSummaryBuf.writeln('User weight history (most recent ${recent.length} days):');
+          weightSummaryBuf.writeln('User weight history (most recent ${recent.length} days):');
           for (final e in recent) {
-            _weightSummaryBuf.writeln('${e.key}: ${e.value.toStringAsFixed(1)} kg');
+            weightSummaryBuf.writeln('${e.key}: ${e.value.toStringAsFixed(1)} kg');
           }
           if (recent.length >= 2) {
             final first = recent.first.value;
@@ -553,13 +560,14 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
             final delta = last - first;
             final days = DateTime.parse(recent.last.key).difference(DateTime.parse(recent.first.key)).inDays;
             final sign = delta >= 0 ? '+' : '';
-            _weightSummaryBuf.writeln('Trend: ${sign}${delta.toStringAsFixed(1)} kg over ${days} days.');
+            weightSummaryBuf.writeln('Trend: ${sign}${delta.toStringAsFixed(1)} kg over ${days} days.');
           }
         } else if (_userWeightKg > 0) {
-          _weightSummaryBuf.writeln('User current weight: ${_userWeightKg.toStringAsFixed(1)} kg.');
+          weightSummaryBuf.writeln('User current weight: ${_userWeightKg.toStringAsFixed(1)} kg');
         }
-      } catch (e) {
-        // ignore any errors building the summary
+      } catch (e, st) {
+        debugPrint('Error building weight summary for AI prompt: $e');
+        debugPrint(st.toString());
       }
 
       // include user's goal from dashboard if available
@@ -592,7 +600,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
               'parts': [
                 {
                   'text':
-                      'Breakfast: ${_currentPlan.breakfast.map((item) => item.label).join(', ')}\nLunch: ${_currentPlan.lunch.map((item) => item.label).join(', ')}\nDinner: ${_currentPlan.dinner.map((item) => item.label).join(', ')}\nSnack: ${_currentPlan.snack.map((item) => item.label).join(', ')}\n\n${_weightSummaryBuf.toString()}' + (userGoal != null && userGoal.isNotEmpty ? '\nUser goal: $userGoal' : '')
+                      'Breakfast: ${_currentPlan.breakfast.map((item) => item.label).join(', ')}\nLunch: ${_currentPlan.lunch.map((item) => item.label).join(', ')}\nDinner: ${_currentPlan.dinner.map((item) => item.label).join(', ')}\nSnack: ${_currentPlan.snack.map((item) => item.label).join(', ')}\n\n${weightSummaryBuf.toString()}' + (userGoal != null && userGoal.isNotEmpty ? '\nUser goal: $userGoal' : '')
                 },
               ],
             },

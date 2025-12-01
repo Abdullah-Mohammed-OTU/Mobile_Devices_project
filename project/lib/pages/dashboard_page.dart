@@ -1,16 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'package:flutter/widgets.dart';
-
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/macro_tracker.dart';
 import '../workout_api/workout_db.dart';
-import 'workouts_page.dart';
-import 'food_planner_page.dart';
 import '../main.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -76,8 +72,9 @@ class _DashboardPageState extends State<DashboardPage> {
           _stepsHistory = map;
         });
       }
-    } catch (e) {
-      // ignore
+    } catch (e, st) {
+      debugPrint('Failed loading steps_history: $e');
+      debugPrint(st.toString());
     }
   }
 
@@ -85,8 +82,9 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('steps_history', jsonEncode(_stepsHistory));
-    } catch (e) {
-      // ignore
+    } catch (e, st) {
+      debugPrint('Failed saving steps_history: $e');
+      debugPrint(st.toString());
     }
   }
 
@@ -101,7 +99,9 @@ class _DashboardPageState extends State<DashboardPage> {
           _goal = _goalOptions[1]; // default to 'Maintain weight'
         }
       });
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('Failed loading dashboard_goal: $e');
+      debugPrint(st.toString());
       setState(() {
         _goal = _goalOptions[1];
       });
@@ -112,8 +112,9 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('dashboard_goal', g);
-    } catch (e) {
-      // ignore
+    } catch (e, st) {
+      debugPrint('Failed saving dashboard_goal: $e');
+      debugPrint(st.toString());
     }
   }
 
@@ -129,14 +130,18 @@ class _DashboardPageState extends State<DashboardPage> {
             final d = (v is num) ? v.toDouble() : double.tryParse('$v') ?? 0.0;
             map[k] = d;
           });
-        } catch (e) {}
+        } catch (e, st) {
+          debugPrint('Failed parsing weight_history inner json: $e');
+          debugPrint(st.toString());
+        }
       }
       setState(() {
         _weightHistory = map;
         _weightUnit = prefs.getString('weight_unit') ?? 'kg';
       });
-    } catch (e) {
-      // ignore
+    } catch (e, st) {
+      debugPrint('Failed loading weight_history: $e');
+      debugPrint(st.toString());
     }
   }
 
@@ -157,8 +162,9 @@ class _DashboardPageState extends State<DashboardPage> {
       setState(() {
         _workoutCalories = sum;
       });
-    } catch (e) {
-      // ignore errors and keep workout calories at 0
+    } catch (e, st) {
+      debugPrint('Failed loading workout calories: $e');
+      debugPrint(st.toString());
     }
   }
 
@@ -190,9 +196,13 @@ class _DashboardPageState extends State<DashboardPage> {
       _lastStepTimestamp = 0;
     });
 
-    _accSub = accelerometerEvents.listen(_onAccelerometerEvent, onError: (e) {});
+    _accSub = accelerometerEvents.listen(_onAccelerometerEvent, onError: (e) {
+      debugPrint('Accelerometer stream error: $e');
+    });
 
-    _gyroSub = gyroscopeEvents.listen(_onGyroscopeEvent, onError: (e) {});
+    _gyroSub = gyroscopeEvents.listen(_onGyroscopeEvent, onError: (e) {
+      debugPrint('Gyroscope stream error: $e');
+    });
 
     setState(() {
       _isTracking = true;
@@ -214,10 +224,12 @@ class _DashboardPageState extends State<DashboardPage> {
       final key = _formatDate(_startOfToday());
       _stepsHistory[key] = _steps;
       await _saveStepsHistory();
-    } catch (e) {
-      // ignore
+    } catch (e, st) {
+      debugPrint('Failed saving todays steps: $e');
+      debugPrint(st.toString());
     }
 
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -662,7 +674,7 @@ class _DashboardPageState extends State<DashboardPage> {
 class _WeightSparkline extends StatelessWidget {
   final List<double> values;
   final Color lineColor;
-  const _WeightSparkline({required this.values, required this.lineColor, super.key});
+  const _WeightSparkline({required this.values, required this.lineColor});
 
   @override
   Widget build(BuildContext context) {
