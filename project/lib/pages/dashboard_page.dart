@@ -6,6 +6,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/macro_tracker.dart';
+import '../workout_api/workout_db.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -20,6 +21,7 @@ class _DashboardPageState extends State<DashboardPage> {
   DateTime _todayDate = DateTime.now();
   MacroTotals _todayTotals = MacroTotals.empty;
   late final VoidCallback _macroListener;
+  double _workoutCalories = 0.0;
 
   @override
   void initState() {
@@ -34,6 +36,29 @@ class _DashboardPageState extends State<DashboardPage> {
     };
     MacroTracker.instance.addListener(_macroListener);
     _loadCardOrder();
+    _loadWorkoutCalories();
+  }
+
+  Future<void> _loadWorkoutCalories() async {
+    try {
+      final rows = await WorkoutDB.getWorkouts();
+      double sum = 0.0;
+      // Heuristic: if weight is stored, scale calories by weight; otherwise fall back to constant per-rep.
+      // Formula: calories_per_rep = weightKg * 0.01 (e.g., 80kg -> 0.8 kcal/rep). If weight is 0 or missing,
+      // fallback to 0.2 kcal/rep to avoid zeroing out older entries.
+      for (final r in rows) {
+        final int sets = (r['sets'] is int) ? r['sets'] as int : int.tryParse('${r['sets']}') ?? 0;
+        final int reps = (r['reps'] is int) ? r['reps'] as int : int.tryParse('${r['reps']}') ?? 0;
+        final double weightKg = (r['weight'] is num) ? (r['weight'] as num).toDouble() : double.tryParse('${r['weight']}') ?? 0.0;
+        final double kcalPerRep = weightKg > 0 ? (weightKg * 0.01) : 0.2;
+        sum += sets * reps * kcalPerRep;
+      }
+      setState(() {
+        _workoutCalories = sum;
+      });
+    } catch (e) {
+      // ignore errors and keep workout calories at 0
+    }
   }
 
   StreamSubscription<AccelerometerEvent>? _accSub;
@@ -197,6 +222,11 @@ class _DashboardPageState extends State<DashboardPage> {
                       child: const Icon(Icons.drag_handle),
                     ),
                   ),
+                  if (_workoutCalories > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Center(child: Text('Includes ${_workoutCalories.toStringAsFixed(0)} kcal from workouts', style: const TextStyle(fontSize: 12, color: Colors.black54))),
+                    ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -273,7 +303,7 @@ class _DashboardPageState extends State<DashboardPage> {
           );
         case 'calories':
           final caloriesIn = _todayTotals.calories;
-          final caloriesOut = _steps * 0.04;
+          final caloriesOut = (_steps * 0.04) + _workoutCalories;
           final net = caloriesIn - caloriesOut;
           return Card(
             key: ValueKey(id),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notifications_service.dart';
 import '../workout_api/exercise_api.dart';
 import '../workout_api/exercise_model.dart';
@@ -14,10 +15,21 @@ class WorkoutsPageState extends State<WorkoutsPage> {
   Exercise? chosen;
   List<Exercise> apiExercises = [];
   List<String> saved = [];
+  String _weightUnit = 'kg';
   @override
   void initState() {
     super.initState();
     loadApiWorkouts();
+    _loadUnit();
+  }
+
+  Future<void> _loadUnit() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _weightUnit = prefs.getString('weight_unit') ?? 'kg';
+      });
+    } catch (e) {}
   }
 
   Future<void> loadApiWorkouts() async {
@@ -64,9 +76,9 @@ class WorkoutsPageState extends State<WorkoutsPage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pick a workout first")));
       return;
     }
-
     TextEditingController setsC = TextEditingController();
     TextEditingController repsC = TextEditingController();
+    TextEditingController weightC = TextEditingController();
     showDialog(
       context: context,
       builder: (dialogCtx) {
@@ -85,6 +97,11 @@ class WorkoutsPageState extends State<WorkoutsPage> {
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: "Reps"),
               ),
+              TextField(
+                controller: weightC,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(labelText: "Weight (${_weightUnit == 'kg' ? 'kg' : 'lbs'})"),
+              ),
             ],
           ),
           actions: [
@@ -94,9 +111,10 @@ class WorkoutsPageState extends State<WorkoutsPage> {
             ),
             TextButton(
               child: const Text("Save"),
-              onPressed: () async {
+                onPressed: () async {
                 int? s = int.tryParse(setsC.text);
                 int? r = int.tryParse(repsC.text);
+                double entered = double.tryParse(weightC.text) ?? 0.0;
                 if (s == null || r == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text("Invalid numbers")),
@@ -104,9 +122,16 @@ class WorkoutsPageState extends State<WorkoutsPage> {
                   return;
                 }
 
-                await WorkoutDB.addWorkout(chosen!.name, s, r);
+                // Convert to kg for storage if user entered lbs
+                double weightKg = entered;
+                if (_weightUnit == 'lbs') {
+                  weightKg = entered * 0.45359237;
+                }
+
+                await WorkoutDB.addWorkout(chosen!.name, s, r, weightKg);
                 setState(() {
-                  saved.add("${chosen!.name}: ${s}x$r");
+                  final displayUnit = _weightUnit;
+                  saved.add("${chosen!.name}: ${s}x$r @ ${entered.toStringAsFixed(1)}${displayUnit == 'kg' ? 'kg' : 'lbs'}");
                 });
                 Navigator.pop(dialogCtx);
               },

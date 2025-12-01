@@ -13,26 +13,37 @@ class WorkoutDB {
     String path = join(await getDatabasesPath(), "workouts.db");
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (Database db, int version) async {
         await db.execute("""
           CREATE TABLE workouts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             exerciseName TEXT,
             sets INTEGER,
-            reps INTEGER
+            reps INTEGER,
+            weight REAL DEFAULT 0.0
           );"""
         );
+      },
+      onUpgrade: (Database db, int oldVersion, int newVersion) async {
+        if (oldVersion < 2) {
+          try {
+            await db.execute('ALTER TABLE workouts ADD COLUMN weight REAL DEFAULT 0.0');
+          } catch (e) {
+            // ignore errors (column may already exist)
+          }
+        }
       },
     );
   }
 
-  static Future<int> addWorkout(String name, int sets, int reps) async {
+  static Future<int> addWorkout(String name, int sets, int reps, double weight) async {
     final database = await db;
     return await database.insert("workouts", {
       "exerciseName": name,
       "sets": sets,
       "reps": reps,
+      "weight": weight,
     });
   }
 
