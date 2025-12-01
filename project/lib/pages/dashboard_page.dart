@@ -286,32 +286,90 @@ class _DashboardPageState extends State<DashboardPage> {
                     child: ReorderableDragStartListener(index: index, child: const Icon(Icons.drag_handle)),
                   ),
                   const SizedBox(height: 8),
-                  const Text('Calories (In / Out)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Calories In', style: TextStyle(fontWeight: FontWeight.w600)),
-                      Text('${caloriesIn.toStringAsFixed(0)} cal'),
-                    ],
+                  // Left-aligned title to match other cards
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: const Text('Calories', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    ),
                   ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Calories Out (est.)', style: TextStyle(fontWeight: FontWeight.w600)),
-                      Text('${caloriesOut.toStringAsFixed(0)} cal'),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Net', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      Text('${net.toStringAsFixed(0)} cal', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: net >= 0 ? Colors.green : Colors.red)),
-                    ],
+                  const SizedBox(height: 12),
+                  // Math-style equation: labels above numbers, operators aligned vertically
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      return Column(
+                        children: [
+                          // Labels row (aligned with columns below)
+                          Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // In label
+                                Expanded(flex: 3, child: Center(child: const Text('In', style: TextStyle(fontSize: 12, color: Colors.black54)))),
+                                const SizedBox(width: 8),
+                                // spacer for operator
+                                SizedBox(width: 28, child: Container()),
+                                const SizedBox(width: 8),
+                                // Out label
+                                Expanded(flex: 3, child: Center(child: const Text('Out', style: TextStyle(fontSize: 12, color: Colors.black54)))),
+                                const SizedBox(width: 8),
+                                // spacer for operator
+                                SizedBox(width: 28, child: Container()),
+                                const SizedBox(width: 8),
+                                // Net label
+                                Expanded(flex: 3, child: Center(child: const Text('Net', style: TextStyle(fontSize: 12, color: Colors.black54)))),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Numbers + operators row
+                          Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                // In value
+                                Expanded(
+                                  flex: 3,
+                                  child: Column(
+                                    children: [
+                                      FittedBox(fit: BoxFit.scaleDown, child: Text(caloriesIn.toStringAsFixed(0), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold))),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                // minus
+                                SizedBox(width: 28, child: FittedBox(fit: BoxFit.scaleDown, child: const Text('-', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)))),
+                                const SizedBox(width: 8),
+                                // Out value
+                                Expanded(
+                                  flex: 3,
+                                  child: Column(
+                                    children: [
+                                      FittedBox(fit: BoxFit.scaleDown, child: Text(caloriesOut.toStringAsFixed(0), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold))),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                // equals
+                                SizedBox(width: 28, child: FittedBox(fit: BoxFit.scaleDown, child: const Text('=', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)))),
+                                const SizedBox(width: 8),
+                                // Net value
+                                Expanded(
+                                  flex: 3,
+                                  child: Column(
+                                    children: [
+                                      FittedBox(fit: BoxFit.scaleDown, child: Text(net.toStringAsFixed(0), style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: net >= 0 ? Colors.green : Colors.red))),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
