@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -22,6 +23,9 @@ class _DashboardPageState extends State<DashboardPage> {
   MacroTotals _todayTotals = MacroTotals.empty;
   late final VoidCallback _macroListener;
   double _workoutCalories = 0.0;
+  // weight history for dashboard card
+  Map<String, double> _weightHistory = {};
+  String _weightUnit = 'kg';
 
   @override
   void initState() {
@@ -37,6 +41,30 @@ class _DashboardPageState extends State<DashboardPage> {
     MacroTracker.instance.addListener(_macroListener);
     _loadCardOrder();
     _loadWorkoutCalories();
+    _loadWeightHistory();
+  }
+
+  Future<void> _loadWeightHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final histJson = prefs.getString('weight_history');
+      final map = <String, double>{};
+      if (histJson != null) {
+        try {
+          final decoded = jsonDecode(histJson) as Map<String, dynamic>;
+          decoded.forEach((k, v) {
+            final d = (v is num) ? v.toDouble() : double.tryParse('$v') ?? 0.0;
+            map[k] = d;
+          });
+        } catch (e) {}
+      }
+      setState(() {
+        _weightHistory = map;
+        _weightUnit = prefs.getString('weight_unit') ?? 'kg';
+      });
+    } catch (e) {
+      // ignore
+    }
   }
 
   Future<void> _loadWorkoutCalories() async {
@@ -180,13 +208,19 @@ class _DashboardPageState extends State<DashboardPage> {
       final saved = prefs.getStringList('dashboard_card_order');
       if (saved != null && saved.isNotEmpty) {
         // validate keys
-        final valid = ['steps', 'macros', 'calories'];
+        final valid = ['steps', 'macros', 'calories', 'weight_history'];
         final filtered = saved.where((s) => valid.contains(s)).toList();
         if (filtered.isNotEmpty) {
           setState(() {
             _cardOrder = filtered;
           });
         }
+      }
+      // ensure weight_history card is present by default
+      if (!_cardOrder.contains('weight_history')) {
+        setState(() {
+          _cardOrder.add('weight_history');
+        });
       }
     } catch (e) {
       // ignore loading errors, keep default order
@@ -401,6 +435,70 @@ class _DashboardPageState extends State<DashboardPage> {
                       );
                     },
                   ),
+                ],
+              ),
+            ),
+          );
+        case 'weight_history':
+          // show recent weight entries and a small trend
+          final entries = _weightHistory.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+          // only consider entries up to today
+          final filtered = entries.where((e) {
+            try {
+              return DateTime.parse(e.key).isBefore(DateTime.now().add(const Duration(days: 1)));
+            } catch (_) {
+              return false;
+            }
+          }).toList();
+          final recent = filtered.isEmpty ? <MapEntry<String, double>>[] : (filtered.length <= 7 ? filtered : filtered.sublist(filtered.length - 7));
+          String? trendText;
+          Color? trendColor;
+          if (recent.length >= 2) {
+            final first = recent.first.value;
+            final last = recent.last.value;
+            final deltaKg = last - first;
+            final firstDate = DateTime.tryParse(recent.first.key) ?? DateTime.now();
+            final lastDate = DateTime.tryParse(recent.last.key) ?? DateTime.now();
+            var days = lastDate.difference(firstDate).inDays;
+            if (days <= 0) days = 1;
+            double displayDelta = deltaKg;
+            String unitLabel = 'kg';
+            if (_weightUnit != 'kg') {
+              displayDelta = deltaKg * 2.2046226218;
+              unitLabel = 'lbs';
+            }
+            final sign = displayDelta >= 0 ? '+' : '';
+            trendText = '${sign}${displayDelta.toStringAsFixed(1)} $unitLabel over ${days}d';
+            trendColor = displayDelta < 0 ? Colors.green : (displayDelta > 0 ? Colors.red : Colors.grey);
+          }
+
+          return Card(
+            key: ValueKey(id),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(child: ReorderableDragStartListener(index: index, child: const Icon(Icons.drag_handle))),
+                  const SizedBox(height: 8),
+                  const Text('Weight History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  if (recent.isEmpty)
+                    const Text('')
+                  else ...[
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: recent.reversed.take(5).map((e) {
+                        final date = e.key;
+                        final val = _weightUnit == 'kg' ? e.value : e.value * 2.2046226218;
+                        return Chip(label: Text('$date: ${val.toStringAsFixed(1)} ${_weightUnit}'));
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                    if (trendText != null)
+                      Text('Trend: $trendText', style: TextStyle(color: trendColor, fontSize: 13)),
+                  ],
                 ],
               ),
             ),

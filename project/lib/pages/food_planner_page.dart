@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/notifications_service.dart';
 import '../services/macro_tracker.dart';
@@ -59,12 +60,88 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
   DateTime _selectedDate = DateTime.now();
   bool _analysisLoading = false;
 
+  double _userWeightKg = 0.0;
+  String _weightUnit = 'kg';
+  Map<String, double> _weightHistory = {}; // dateString -> kg
+
   final Map<String, _DayPlan> _plans = {};
 
   @override
   void initState() {
     super.initState();
     _updateMacroTotals();
+    _loadUserWeight();
+  }
+
+  Future<void> _loadUserWeight() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final histJson = prefs.getString('weight_history');
+      final map = <String, double>{};
+      if (histJson != null) {
+        try {
+          final decoded = jsonDecode(histJson) as Map<String, dynamic>;
+          decoded.forEach((k, v) {
+            final d = (v is num) ? v.toDouble() : double.tryParse('$v') ?? 0.0;
+            map[k] = d;
+          });
+        } catch (e) {}
+      }
+      final defaultKg = prefs.getDouble('user_weight_kg') ?? 0.0;
+      setState(() {
+        _weightHistory = map;
+        _weightUnit = prefs.getString('weight_unit') ?? 'kg';
+        _userWeightKg = _weightHistory[_formatDate(_selectedDate)] ?? defaultKg;
+      });
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  Future<void> _setUserWeightKg(double kg) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // save to history by date
+      final key = _formatDate(_selectedDate);
+      _weightHistory[key] = kg;
+      await prefs.setString('weight_history', jsonEncode(_weightHistory));
+      // also keep a default user_weight_kg for quick access
+      await prefs.setDouble('user_weight_kg', kg);
+      setState(() {
+        _userWeightKg = kg;
+      });
+    } catch (e) {}
+  }
+
+  void _showEditWeightDialog() {
+    final controller = TextEditingController(text: (_weightUnit == 'kg' ? _userWeightKg : (_userWeightKg * 2.2046226218)).toStringAsFixed(1));
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Edit Weight'),
+          content: TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(labelText: 'Weight (${_weightUnit == 'kg' ? 'kg' : 'lbs'})'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () {
+                final v = double.tryParse(controller.text);
+                if (v != null) {
+                  final kg = _weightUnit == 'kg' ? v : v * 0.45359237;
+                  _setUserWeightKg(kg);
+                }
+                Navigator.pop(ctx);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _maybeNotifyWhenComplete() async {
@@ -293,14 +370,16 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
                       style: TextStyle(fontSize: 12),
                     ),
                   const SizedBox(height: 8),
-                  SizedBox(
-                    height: 260,
-                    width: double.maxFinite,
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(dialogContext).size.height * 0.6,
+                    ),
                     child: results.isEmpty
                         ? const SizedBox.shrink()
                         : ListView.builder(
+                            shrinkWrap: true,
                             itemCount: results.length,
-                             itemBuilder: (context, index) {
+                            itemBuilder: (context, index) {
                                final item =
                                    results[index] as Map<String, dynamic>;
                                final String name =
@@ -347,7 +426,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
                                  },
                                );
                              },
-                           ),
+                          ),
                   ),
                 ],
               ),
@@ -391,6 +470,10 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
         _selectedDate = picked;
         _analysisLoading = false;
         _currentPlan.mealsNotificationSent = false;
+      });
+      // update displayed weight for the newly selected date
+      setState(() {
+        _userWeightKg = _weightHistory[_formatDate(_selectedDate)] ?? _userWeightKg;
       });
       _updateMacroTotals();
     }
@@ -453,6 +536,32 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
     );
 
     try {
+      // Build a brief weight-history summary (up to 7 recent days) to give the AI context.
+      final StringBuffer _weightSummaryBuf = StringBuffer();
+      try {
+        if (_weightHistory.isNotEmpty) {
+          final entries = _weightHistory.entries.toList()
+            ..sort((a, b) => a.key.compareTo(b.key));
+          final recent = entries.length <= 7 ? entries : entries.sublist(entries.length - 7);
+          _weightSummaryBuf.writeln('User weight history (most recent ${recent.length} days):');
+          for (final e in recent) {
+            _weightSummaryBuf.writeln('${e.key}: ${e.value.toStringAsFixed(1)} kg');
+          }
+          if (recent.length >= 2) {
+            final first = recent.first.value;
+            final last = recent.last.value;
+            final delta = last - first;
+            final days = DateTime.parse(recent.last.key).difference(DateTime.parse(recent.first.key)).inDays;
+            final sign = delta >= 0 ? '+' : '';
+            _weightSummaryBuf.writeln('Trend: ${sign}${delta.toStringAsFixed(1)} kg over ${days} days.');
+          }
+        } else if (_userWeightKg > 0) {
+          _weightSummaryBuf.writeln('User current weight: ${_userWeightKg.toStringAsFixed(1)} kg.');
+        }
+      } catch (e) {
+        // ignore any errors building the summary
+      }
+
       final response = await http.post(
         uri,
         headers: {
@@ -474,7 +583,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
               'parts': [
                 {
                   'text':
-                      'Breakfast: ${_currentPlan.breakfast.map((item) => item.label).join(', ')}\nLunch: ${_currentPlan.lunch.map((item) => item.label).join(', ')}\nDinner: ${_currentPlan.dinner.map((item) => item.label).join(', ')}\nSnack: ${_currentPlan.snack.map((item) => item.label).join(', ')}'
+                      'Breakfast: ${_currentPlan.breakfast.map((item) => item.label).join(', ')}\nLunch: ${_currentPlan.lunch.map((item) => item.label).join(', ')}\nDinner: ${_currentPlan.dinner.map((item) => item.label).join(', ')}\nSnack: ${_currentPlan.snack.map((item) => item.label).join(', ')}\n\n${_weightSummaryBuf.toString()}'
                 },
               ],
             },
@@ -560,6 +669,82 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
     );
   }
 
+  Widget _buildWeightCard() {
+    final display = _weightUnit == 'kg'
+      ? (_userWeightKg > 0 ? '${_userWeightKg.toStringAsFixed(1)} kg' : '')
+      : (_userWeightKg > 0 ? '${(_userWeightKg * 2.2046226218).toStringAsFixed(1)} lbs' : '');
+
+    // compute a small recent trend (up to 7 days) using stored weight history
+    String? trendText;
+    Color? trendColor;
+    try {
+      if (_weightHistory.isNotEmpty) {
+        final entries = _weightHistory.entries.toList()
+          ..sort((a, b) => a.key.compareTo(b.key));
+        // only consider entries up to the selected date
+        final filtered = entries.where((e) {
+          try {
+            return DateTime.parse(e.key).isBefore(_selectedDate.add(const Duration(days: 1)));
+          } catch (_) {
+            return false;
+          }
+        }).toList();
+        if (filtered.isNotEmpty) {
+          final recent = filtered.length <= 7 ? filtered : filtered.sublist(filtered.length - 7);
+          if (recent.length >= 2) {
+            final first = recent.first.value;
+            final last = recent.last.value;
+            final deltaKg = last - first;
+            final firstDate = DateTime.parse(recent.first.key);
+            final lastDate = DateTime.parse(recent.last.key);
+            var days = lastDate.difference(firstDate).inDays;
+            if (days <= 0) days = 1;
+            double displayDelta = deltaKg;
+            String unitLabel = 'kg';
+            if (_weightUnit != 'kg') {
+              displayDelta = deltaKg * 2.2046226218;
+              unitLabel = 'lbs';
+            }
+            final sign = displayDelta >= 0 ? '+' : '';
+            trendText = 'Trend: ${sign}${displayDelta.toStringAsFixed(1)} $unitLabel over ${days}d';
+            trendColor = displayDelta < 0 ? Colors.green : (displayDelta > 0 ? Colors.red : Colors.grey);
+          }
+        }
+      }
+    } catch (e) {
+      // ignore errors computing trend
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12.0),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Weight', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Text(display, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                if (trendText != null) ...[
+                  const SizedBox(height: 6),
+                  Text(trendText, style: TextStyle(fontSize: 12, color: trendColor ?? Colors.black54)),
+                ],
+              ],
+            ),
+            ElevatedButton.icon(
+              onPressed: _showEditWeightDialog,
+              icon: const Icon(Icons.edit),
+              label: Text(_userWeightKg > 0 ? 'Edit' : 'Set weight'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -578,6 +763,9 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
                       style: const TextStyle(fontSize: 16),
                     ),
                   ),
+                  const SizedBox(width: 12),
+                  // Weight moved to its own card below
+                  SizedBox.shrink(),
                   TextButton(
                     onPressed: _clearCurrentPlan,
                     child: const Text('Clear day'),
@@ -588,6 +776,9 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              // Insert the weight card here so it visually matches the meal cards
+              _buildWeightCard(),
               const SizedBox(height: 12),
               _buildMealSection(
                 'Breakfast',
