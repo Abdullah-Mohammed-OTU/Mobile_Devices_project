@@ -523,30 +523,39 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
 
   Widget _buildMealSection(
       String title, List<_FoodItem> mealList, VoidCallback onAddPressed) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12.0),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                ),
+                ElevatedButton.icon(
+                  onPressed: onAddPressed,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add'),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
+            const SizedBox(height: 8),
             mealList.isEmpty
-                ? 'No items'
-                : mealList.map((item) => item.label).join(', '),
-          ),
-          const SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: onAddPressed,
-            child: const Text('Add Food'),
-          ),
-        ],
+                ? const Text('No items', style: TextStyle(color: Colors.black54))
+                : Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: mealList
+                        .map((item) => Chip(
+                              label: Text(item.label),
+                            ))
+                        .toList(),
+                  ),
+          ],
+        ),
       ),
     );
   }
@@ -554,7 +563,6 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Food Planner')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
@@ -602,32 +610,36 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
                 () => _showFoodSearchDialog(_currentPlan.snack, 'Snack'),
               ),
               const Divider(height: 32),
-              const Text(
-                'AI Plan Analysis',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: _analysisLoading ? null : _analyzePlan,
-                child: _analysisLoading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Analyze'),
-              ),
-              const SizedBox(height: 8),
-              if (_currentPlan.analysisError != null)
-                Text(
-                  _currentPlan.analysisError!,
-                  style: const TextStyle(color: Colors.red),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text('AI Plan Analysis', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        onPressed: _analysisLoading ? null : _analyzePlan,
+                        icon: _analysisLoading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.analytics),
+                        label: const Text('Analyze'),
+                      ),
+                      const SizedBox(height: 8),
+                      if (_currentPlan.analysisError != null)
+                        Text(
+                          _currentPlan.analysisError!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      if (_currentPlan.analysisResult != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          _currentPlan.analysisResult!,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              if (_currentPlan.analysisResult != null)
-                Text(
-                  _currentPlan.analysisResult!,
-                  style: const TextStyle(fontSize: 14),
-                ),
+              ),
             ],
           ),
         ),

@@ -32,26 +32,34 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'Preferences',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Preferences', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    title: const Text('Notifications'),
+                    subtitle: const Text('Enable workout and meal reminders'),
+                    value: _notificationsEnabled,
+                    onChanged: _loading ? null : _toggleNotifications,
+                  ),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            title: const Text('Notifications'),
-            subtitle: const Text('Enable workout and meal reminders'),
-            value: _notificationsEnabled,
-            onChanged: _loading ? null : _toggleNotifications,
-          ),
-          const SizedBox(height: 24),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Log out'),
-            onTap: widget.onLogout,
+          const SizedBox(height: 16),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Log out'),
+              onTap: widget.onLogout,
+            ),
           ),
         ],
       ),

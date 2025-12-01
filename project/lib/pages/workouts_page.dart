@@ -200,63 +200,78 @@ class WorkoutsPageState extends State<WorkoutsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Workouts")),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (saved.isNotEmpty)
-              Container(
-                constraints: const BoxConstraints(
-                  maxHeight: 150,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (saved.isNotEmpty)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Logged Workouts', style: TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 8),
+                        Text(saved.join('\n')),
+                      ],
+                    ),
+                  ),
                 ),
-                child: Text(
-                  "Logged Workouts:\n${saved.join("\n")}",
-                  style: const TextStyle(fontSize: 16),
-                  textAlign: TextAlign.left,
-                ),
-              ),
-            if (chosen != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                "Chosen Workout: ${chosen!.name}",
-                style: const TextStyle(fontSize: 16),
-                textAlign: TextAlign.left,
-              ),
-            ],
-            const Spacer(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ElevatedButton(
-                      onPressed: pickWorkout,
-                      child: const Text("Choose Workout"),
+              if (chosen != null) ...[
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Chosen Workout', style: const TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 6),
+                        Text(chosen!.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: logSetsReps,
-                      child: const Text("Log Sets & Reps"),
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: showTips,
-                      child: const Text("Show Tips for Workout"),
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: startWorkoutDialog,
-                      child: const Text("Start Workout"),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+                  ),
                 ),
               ],
-            ),
-          ],
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: pickWorkout,
+                        icon: const Icon(Icons.search),
+                        label: const Text('Choose Workout'),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: logSetsReps,
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Log Sets & Reps'),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: showTips,
+                        icon: const Icon(Icons.lightbulb),
+                        label: const Text('Show Tips'),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: startWorkoutDialog,
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('Start Workout'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

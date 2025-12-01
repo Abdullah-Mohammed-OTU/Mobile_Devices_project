@@ -43,79 +43,69 @@ class _SocialFeedPageState extends State<SocialFeedPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Social Feed')),
       body: _post.isEmpty
           ? const Center(
-        child: Text(
-          'Be the first to post!',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-      )
+              child: Text(
+                'Be the first to post!',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              ),
+            )
           : ListView.builder(
-        itemCount: _post.length,
-        itemBuilder: (context, index) {
-          var post = _post[index];
-          return ListTile(
-            contentPadding: const EdgeInsets.all(12),
-            leading: CircleAvatar(
-              radius: 20,
-              backgroundColor: Colors.green,
-              //child: const Text('MC'),
+              padding: const EdgeInsets.all(12),
+              itemCount: _post.length,
+              itemBuilder: (context, index) {
+                var post = _post[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 20,
+                              backgroundColor: Colors.green,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(post.username ?? 'User', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 2),
+                                  Text(post.DateAndTime ?? '', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.more_horiz, color: Colors.grey),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(post.content ?? '', style: const TextStyle(fontSize: 14)),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: const [
+                            Icon(Icons.chat_bubble_outline, color: Colors.grey, size: 18),
+                            SizedBox(width: 8),
+                            Text('0'),
+                            SizedBox(width: 16),
+                            Icon(Icons.repeat, color: Colors.grey, size: 18),
+                            SizedBox(width: 8),
+                            Text('0'),
+                            SizedBox(width: 16),
+                            Icon(Icons.favorite_border, color: Colors.grey, size: 18),
+                            SizedBox(width: 8),
+                            Text('0'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
-            title: Row(
-              children: [
-                Text(
-                  "Username",
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-                const SizedBox(width: 8),
-                /*
-                Text(
-                  'shortname',
-                  style: const TextStyle(color: Colors.grey, fontSize: 15),
-                ),
-                 */
-                const SizedBox(width: 8),
-                Text(
-                  '${post.DateAndTime}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 15),
-                ),
-                const Spacer(),
-                const Icon(Icons.expand_more, color: Colors.grey, size: 15),
-              ],
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                Text(
-                  '${post.content}',
-                  style: TextStyle(fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.chat_bubble_outline, color: Colors.grey, size: 15),
-                    SizedBox(width: 4),
-                    Text('0', style: TextStyle(fontSize: 15)),
-                    SizedBox(width: 20),
-                    Icon(Icons.repeat, color: Colors.grey, size: 15),
-                    SizedBox(width: 4),
-                    Text('0', style: TextStyle(fontSize: 15)),
-                    SizedBox(width: 20),
-                    Icon(Icons.favorite_border, color: Colors.grey, size: 15),
-                    SizedBox(width: 4),
-                    Text('0', style: TextStyle(fontSize: 15)),
-                    SizedBox(width: 20),
-                    Icon(Icons.bookmark_border, color: Colors.grey, size: 15),
-                  ],
-                ),
-              ],
-            ),
-          );
-
-        },
-    ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           showDialog(
@@ -134,8 +124,7 @@ class _SocialFeedPageState extends State<SocialFeedPage> {
                       keyboardType: TextInputType.multiline,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
-                        hintText:
-                        'Tell others about your progress, workout routine and more!',
+                        hintText: 'Tell others about your progress, workout routine and more!',
                       ),
                     ),
                   ],
@@ -147,12 +136,8 @@ class _SocialFeedPageState extends State<SocialFeedPage> {
                   ),
                   TextButton(
                     onPressed: () {
-
                       if (nameController.text.length > 1) {
-                        //print('User wrote: ${nameController.text}');
-                        var newPost = Post(username: "Person",
-                            content: nameController.text,
-                            DateAndTime: '${DateTime.now()}');
+                        var newPost = Post(username: "Person", content: nameController.text, DateAndTime: '${DateTime.now()}');
                         setState(() {
                           _post.add(newPost);
                           nameController.text = "";
