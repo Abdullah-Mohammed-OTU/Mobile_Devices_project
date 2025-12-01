@@ -146,12 +146,34 @@ class _SocialFeedPageState extends State<SocialFeedPage> {
                 ),
               ],
             ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                post.content ?? "",
-                style: const TextStyle(fontSize: 15),
-              ),
+            subtitle:
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                Text(
+                  post.content ?? "",
+                  style: TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.chat_bubble_outline, color: Colors.grey, size: 15),
+                    SizedBox(width: 4),
+                    Text('0', style: TextStyle(fontSize: 15)),
+                    SizedBox(width: 20),
+                    Icon(Icons.repeat, color: Colors.grey, size: 15),
+                    SizedBox(width: 4),
+                    Text('0', style: TextStyle(fontSize: 15)),
+                    SizedBox(width: 20),
+                    Icon(Icons.favorite_border, color: Colors.grey, size: 15),
+                    SizedBox(width: 4),
+                    Text('0', style: TextStyle(fontSize: 15)),
+                    SizedBox(width: 20),
+                    Icon(Icons.bookmark_border, color: Colors.grey, size: 15),
+                  ],
+                ),
+              ],
             ),
             trailing: IconButton(
               icon: Icon(Icons.delete, color: Colors.red),
