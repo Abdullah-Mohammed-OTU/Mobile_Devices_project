@@ -151,53 +151,85 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Dashboard')),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Today: ${_formatDate(_todayDate)}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                ElevatedButton(
-                  onPressed: _toggleTracking,
-                  child: Text(_isTracking ? 'Stop Step Tracking' : 'Start Step Tracking'),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Steps', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 8),
+                          Text('$_steps', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 6),
+                          if (_isTracking)
+                            const Text('(tracking)', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: _toggleTracking,
+                      child: Text(_isTracking ? 'Stop' : 'Start'),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Text(
-                  'Steps: $_steps',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Today's macros", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Calories', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text('${_todayTotals.calories.toStringAsFixed(0)} cal'),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Protein', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text('${_todayTotals.protein.toStringAsFixed(1)} g'),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Carbs', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text('${_todayTotals.carbs.toStringAsFixed(1)} g'),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Fat', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text('${_todayTotals.fat.toStringAsFixed(1)} g'),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                if (_isTracking)
-                  const Text('(tracking)', style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              "Today's macros",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Calories: ${_todayTotals.calories.toStringAsFixed(0)} cal',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            Text(
-              'Protein: ${_todayTotals.protein.toStringAsFixed(1)} g',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            Text(
-              'Carbs: ${_todayTotals.carbs.toStringAsFixed(1)} g',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            Text(
-              'Fat: ${_todayTotals.fat.toStringAsFixed(1)} g',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
             ),
           ],
         ),
