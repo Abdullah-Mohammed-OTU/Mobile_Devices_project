@@ -297,27 +297,53 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
                     }));
 
                 if (response.statusCode == 200) {
-                  final data =
-                      jsonDecode(response.body) as Map<String, dynamic>;
+                  // Log raw response to help debug parsing issues from the model.
+                  try {
+                    debugPrint('Food search raw response body: ${response.body}');
+                  } catch (_) {}
+
+                  final data = jsonDecode(response.body) as Map<String, dynamic>;
                   final candidates = data['candidates'] as List?;
                   final String? content =
                       (candidates != null && candidates.isNotEmpty)
                           ? _extractGeminiText(candidates.first)
                           : null;
+                  try {
+                    debugPrint('Food search extracted content: ${content ?? '<null>'}');
+                  } catch (_) {}
 
-                  final parsedItems =
-                      content == null ? <dynamic>[] : _parseFoodItems(content);
+                  // Try to parse items from the model text content. If that fails,
+                  // attempt more permissive parsing from the raw response body.
+                  List<dynamic> parsedItems = [];
+                  if (content != null) {
+                    parsedItems = _parseFoodItems(content);
+                  }
 
                   if (parsedItems.isEmpty) {
+                    // Second-pass: try parsing the raw response body directly.
+                    try {
+                      parsedItems = _parseFoodItems(response.body);
+                    } catch (_) {
+                      parsedItems = [];
+                    }
+                  }
+
+                  if (parsedItems.isEmpty) {
+                    // Safely extract finishReason if present.
+                    String finishReason = '';
+                    try {
+                      if (candidates != null && candidates.isNotEmpty) {
+                        final first = candidates.first;
+                        if (first is Map && first['finishReason'] is String) {
+                          finishReason = first['finishReason'] as String;
+                        }
+                      }
+                    } catch (_) {
+                      finishReason = '';
+                    }
+
                     setStateDialog(() {
                       results = [];
-                      final finishReason = (candidates != null &&
-                              candidates.isNotEmpty &&
-                              candidates.first is Map<String, dynamic>)
-                          ? ((candidates.first as Map<String, dynamic>?)
-                                      ?['finishReason'] as String?) ??
-                              ''
-                          : '';
                       errorMessage =
                           'No items returned from the nutrition response.\nFinish reason: $finishReason\nRaw reply: ${content ?? jsonEncode(data)}';
                       isLoading = false;
@@ -336,10 +362,15 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
                     isLoading = false;
                   });
                 }
-              } catch (e) {
+              } catch (e, st) {
+                // Log the exception for debugging and show details to the user.
+                try {
+                  debugPrint('Food search exception: $e');
+                  debugPrint(st.toString());
+                } catch (_) {}
                 setStateDialog(() {
                   results = [];
-                  errorMessage = 'Failed to load foods.';
+                  errorMessage = 'Failed to load foods: ${e.toString()}';
                   isLoading = false;
                 });
               }
@@ -396,9 +427,7 @@ class _FoodPlannerPageState extends State<FoodPlannerPage> {
                                final double protein =
                                    (item['protein_g'] as num?)?.toDouble() ?? 0;
                                final double carbs =
-                                   (item['carbohydrates_total_g'] as num?)
-                                           ?.toDouble() ??
-                                       0;
+                                   (item['carbohydrates_total_g'] as num?)?.toDouble() ?? 0;
                                  final double fat =
                                    (item['fat_total_g'] as num?)?.toDouble() ??
                                        0;

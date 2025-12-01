@@ -1,7 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-// notifications_service not used here
+import '../services/notifications_service.dart';
 import '../workout_api/exercise_api.dart';
 import '../workout_api/exercise_model.dart';
 import '../workout_api/workout_db.dart';
@@ -20,6 +21,11 @@ class WorkoutsPageState extends State<WorkoutsPage> {
   List<Map<String, dynamic>> recentWorkouts = [];
   List<Map<String, dynamic>> currentSession = [];
   String _weightUnit = 'kg';
+  // Timed workout state
+  Timer? _timedWorkoutTimer;
+  Timer? _timedWorkoutTicker;
+  int? _timedWorkoutMinutes;
+  DateTime? _timedWorkoutEndTime;
   @override
   void initState() {
     super.initState();
@@ -27,6 +33,69 @@ class WorkoutsPageState extends State<WorkoutsPage> {
     _loadCustomExercises();
     _loadRecentWorkouts();
     _loadUnit();
+  }
+
+  @override
+  void dispose() {
+    _timedWorkoutTimer?.cancel();
+    _timedWorkoutTicker?.cancel();
+    super.dispose();
+  }
+
+  void _startTimedWorkout(int minutes) async {
+    // cancel existing
+    _timedWorkoutTimer?.cancel();
+    _timedWorkoutTicker?.cancel();
+    _timedWorkoutMinutes = minutes;
+    _timedWorkoutEndTime = DateTime.now().add(Duration(minutes: minutes));
+    // notify start
+    await NotificationService.instance.notifyWorkoutStart();
+
+    // ticker to update UI every second
+    _timedWorkoutTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {});
+    });
+
+    // schedule completion
+    _timedWorkoutTimer = Timer(Duration(minutes: minutes), () async {
+      try {
+        await NotificationService.instance.notifyWorkoutComplete(minutes);
+      } catch (_) {}
+      _timedWorkoutMinutes = null;
+      _timedWorkoutEndTime = null;
+      _timedWorkoutTimer?.cancel();
+      _timedWorkoutTicker?.cancel();
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Timed workout complete ($minutes min)')));
+      }
+    });
+    if (mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Timed workout started for $minutes minutes')));
+    }
+  }
+
+  void _cancelTimedWorkout() {
+    _timedWorkoutTimer?.cancel();
+    _timedWorkoutTicker?.cancel();
+    _timedWorkoutTimer = null;
+    _timedWorkoutTicker = null;
+    _timedWorkoutMinutes = null;
+    _timedWorkoutEndTime = null;
+    if (mounted) setState(() {});
+  }
+
+  String _formatRemaining(DateTime end) {
+    final rem = end.difference(DateTime.now());
+    if (rem.isNegative) return '0s';
+    final h = rem.inHours;
+    final m = rem.inMinutes % 60;
+    final s = rem.inSeconds % 60;
+    if (h > 0) return '${h}h ${m}m ${s}s';
+    if (m > 0) return '${m}m ${s}s';
+    return '${s}s';
   }
 
   Future<void> _loadRecentWorkouts() async {
@@ -497,6 +566,103 @@ class WorkoutsPageState extends State<WorkoutsPage> {
                         icon: const Icon(Icons.lightbulb),
                         label: const Text('Show Tips'),
                       ),
+                      const SizedBox(height: 12),
+                      // Timed workout controls
+                      if (_timedWorkoutMinutes == null)
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            // choose minutes and start
+                            showDialog<int>(
+                              context: context,
+                              builder: (dctx) {
+                                int selected = 15;
+                                String customText = '15';
+                                final opts = [5, 10, 15, 20, 30, 45, 60];
+                                return StatefulBuilder(
+                                  builder: (ctx, setSt) {
+                                    return AlertDialog(
+                                      title: const Text('Start Timed Workout'),
+                                      content: SingleChildScrollView(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            ...opts.map((m) {
+                                              return RadioListTile<int>(
+                                                value: m,
+                                                groupValue: selected,
+                                                title: Text('$m minutes'),
+                                                onChanged: (v) => setSt(() => selected = v ?? selected),
+                                              );
+                                            }).toList(),
+                                            RadioListTile<int>(
+                                              value: -1,
+                                              groupValue: selected,
+                                              title: Row(
+                                                children: [
+                                                  const Text('Custom'),
+                                                  const SizedBox(width: 8),
+                                                  if (selected == -1)
+                                                    SizedBox(
+                                                      width: 120,
+                                                      child: TextField(
+                                                        keyboardType: TextInputType.number,
+                                                        decoration: const InputDecoration(hintText: 'Minutes'),
+                                                        onChanged: (v) => setSt(() => customText = v),
+                                                        controller: TextEditingController(text: customText),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                              onChanged: (v) => setSt(() => selected = v ?? selected),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(dctx), child: const Text('Cancel')),
+                                        TextButton(
+                                          onPressed: () {
+                                            final minutes = selected == -1 ? int.tryParse(customText) : selected;
+                                            if ((minutes ?? 0) <= 0) {
+                                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid number of minutes')));
+                                              return;
+                                            }
+                                            Navigator.pop(dctx, minutes);
+                                          },
+                                          child: const Text('Start'),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            ).then((minutes) {
+                              if (minutes != null) _startTimedWorkout(minutes);
+                            });
+                          },
+                          icon: const Icon(Icons.timer),
+                          label: const Text('Timed Workout'),
+                        )
+                      else
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _timedWorkoutEndTime == null
+                                    ? 'Timed workout: ${_timedWorkoutMinutes} min'
+                                    : 'Ends in ${_formatRemaining(_timedWorkoutEndTime!)}',
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                _cancelTimedWorkout();
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Timed workout cancelled')));
+                              },
+                              child: const Text('Cancel'),
+                            )
+                          ],
+                        ),
                       const SizedBox(height: 12),
                     ],
                   ),
