@@ -1,27 +1,30 @@
 import 'package:flutter/material.dart';
-
-final int a = 5;
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 
 class Post {
-  Post({this.username, this.content, this.DateAndTime});
+  Post({this.id, this.username, this.content, this.dateAndTime});
 
+  int? id;
   String? username;
   String? content;
-  String? DateAndTime;
+  String? dateAndTime;
 
   Post.fromMap(Map<String, dynamic> map) {
+    id = map['id'];
     username = map['username'];
     content = map['content'];
+    dateAndTime = map['dateAndTime'];
   }
 
   Map<String, dynamic> toMap() {
     return {
       'username': username,
       'content': content,
+      'dateAndTime': dateAndTime,
     };
   }
 }
-
 
 class SocialFeedPage extends StatefulWidget {
   const SocialFeedPage({super.key});
@@ -32,19 +35,91 @@ class SocialFeedPage extends StatefulWidget {
 
 class _SocialFeedPageState extends State<SocialFeedPage> {
   final TextEditingController nameController = TextEditingController();
-  List<Post> _post = [];
+  final TextEditingController shortController = TextEditingController();
+
+  List<Post> _posts = [];
+  late Database database;
+  bool dbLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDatabase();
+  }
+
+  Future<void> _initDatabase() async {
+    var dbPath = await getDatabasesPath();
+    String path = join(dbPath, 'mydatabase.db');
+
+    database = await openDatabase(
+      path,
+      version: 1,
+      onCreate: (db, version) async {
+        await db.execute("""
+          CREATE TABLE Post(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            content TEXT,
+            dateAndTime TEXT
+          )
+        """);
+      },
+    );
+
+    await _loadPosts();
+    setState(() => dbLoaded = true);
+  }
+
+  Future<void> _insertPost(Post newPost) async {
+    await database.insert(
+      'Post',
+      newPost.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    await _loadPosts();
+  }
+
+  Future<List<Map<String, dynamic>>> _getPost() async {
+    return await database.query(
+      'Post',
+      orderBy: "id DESC",
+    );
+  }
+
+  Future<void> _deletePost(int id) async {
+    await database.delete(
+      'Post',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    await _loadPosts();
+  }
+
+
+  Future<void> _loadPosts() async {
+    List<Map<String, dynamic>> records = await _getPost();
+    _posts = records.map((map) => Post.fromMap(map)).toList();
+    setState(() {});
+  }
 
   @override
   void dispose() {
     nameController.dispose();
+    shortController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!dbLoaded) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Social Feed')),
-      body: _post.isEmpty
+      body: _posts.isEmpty
           ? const Center(
         child: Text(
           'Be the first to post!',
@@ -52,94 +127,72 @@ class _SocialFeedPageState extends State<SocialFeedPage> {
         ),
       )
           : ListView.builder(
-        itemCount: _post.length,
+        itemCount: _posts.length,
         itemBuilder: (context, index) {
-          var post = _post[index];
+          var post = _posts[index];
           return ListTile(
             contentPadding: const EdgeInsets.all(12),
-            leading: CircleAvatar(
-              radius: 20,
-              backgroundColor: Colors.green,
-              //child: const Text('MC'),
-            ),
+            leading: CircleAvatar(radius: 20, backgroundColor: Colors.green),
             title: Row(
               children: [
                 Text(
-                  "Username",
+                  post.username ?? "",
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
                 const SizedBox(width: 8),
-                /*
                 Text(
-                  'shortname',
-                  style: const TextStyle(color: Colors.grey, fontSize: 15),
+                  post.dateAndTime ?? "",
+                  style: const TextStyle(color: Colors.grey, fontSize: 14),
                 ),
-                 */
-                const SizedBox(width: 8),
-                Text(
-                  '${post.DateAndTime}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 15),
-                ),
-                const Spacer(),
-                const Icon(Icons.expand_more, color: Colors.grey, size: 15),
               ],
             ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                Text(
-                  '${post.content}',
-                  style: TextStyle(fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.chat_bubble_outline, color: Colors.grey, size: 15),
-                    SizedBox(width: 4),
-                    Text('0', style: TextStyle(fontSize: 15)),
-                    SizedBox(width: 20),
-                    Icon(Icons.repeat, color: Colors.grey, size: 15),
-                    SizedBox(width: 4),
-                    Text('0', style: TextStyle(fontSize: 15)),
-                    SizedBox(width: 20),
-                    Icon(Icons.favorite_border, color: Colors.grey, size: 15),
-                    SizedBox(width: 4),
-                    Text('0', style: TextStyle(fontSize: 15)),
-                    SizedBox(width: 20),
-                    Icon(Icons.bookmark_border, color: Colors.grey, size: 15),
-                  ],
-                ),
-              ],
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                post.content ?? "",
+                style: const TextStyle(fontSize: 15),
+              ),
+            ),
+            trailing: IconButton(
+              icon: Icon(Icons.delete, color: Colors.red),
+              onPressed: () {
+                _deletePost(post.id!);
+              },
             ),
           );
-
         },
-    ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           showDialog(
             context: context,
-            builder: (BuildContext context) {
+            builder: (context) {
               return AlertDialog(
                 title: const Text('Make a post'),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 10),
                     TextField(
                       controller: nameController,
                       maxLines: 5,
-                      keyboardType: TextInputType.multiline,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
-                        hintText:
-                        'Tell others about your progress, workout routine and more!',
+                        hintText: 'Tell others about your progress...',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: shortController,
+                      maxLength: 10,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        hintText: 'Enter a username',
+                        counterText: "",
                       ),
                     ),
                   ],
                 ),
+
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
@@ -147,20 +200,19 @@ class _SocialFeedPageState extends State<SocialFeedPage> {
                   ),
                   TextButton(
                     onPressed: () {
+                      if (nameController.text.isNotEmpty) {
+                        var newPost = Post(
+                          username: (shortController.text.length > 1)
+                              ? shortController.text
+                              : "User",
+                          content: nameController.text,
+                          dateAndTime: DateTime.now().toString(),
 
-                      if (nameController.text.length > 1) {
-                        //print('User wrote: ${nameController.text}');
-                        var newPost = Post(username: "Person",
-                            content: nameController.text,
-                            DateAndTime: '${DateTime.now()}');
-                        setState(() {
-                          _post.add(newPost);
-                          nameController.text = "";
-                        });
-                        Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Uploaded')),
                         );
+                        _insertPost(newPost);
+                        nameController.clear();
+                        shortController.clear();
+                        Navigator.of(context).pop();
                       }
                     },
                     child: const Text('Post'),
