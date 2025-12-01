@@ -351,22 +351,31 @@ class _DashboardPageState extends State<DashboardPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Center(child: ReorderableDragStartListener(index: index, child: const Icon(Icons.drag_handle))),
                   const SizedBox(height: 8),
-                  const Text('My goal is:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  DropdownButton<String>(
-                    value: _goal.isNotEmpty ? _goal : null,
-                    hint: const Text('Select a goal'),
-                    isExpanded: true,
-                    items: _goalOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-                    onChanged: (val) {
-                      if (val == null) return;
-                      setState(() {
-                        _goal = val;
-                      });
-                      _saveGoal(val);
-                    },
+                  Row(
+                    children: [
+                      const Expanded(
+                        flex: 3,
+                        child: Text('My goal is:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 5,
+                        child: DropdownButton<String>(
+                          value: _goal.isNotEmpty ? _goal : null,
+                          hint: const Text('Select a goal'),
+                          isExpanded: true,
+                          items: _goalOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                          onChanged: (val) {
+                            if (val == null) return;
+                            setState(() {
+                              _goal = val;
+                            });
+                            _saveGoal(val);
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -656,12 +665,20 @@ class _DashboardPageState extends State<DashboardPage> {
         children: List.generate(_cardOrder.length, (i) => buildCard(i, _cardOrder[i])),
         onReorder: (oldIndex, newIndex) {
           setState(() {
+            // Prevent the 'goal' card from being moved — keep it locked at index 0.
+            if (_cardOrder[oldIndex] == 'goal') return;
+
+            // Never allow inserting before index 0 (keep goal at top).
+            if (newIndex == 0) newIndex = 1;
+
             if (newIndex > oldIndex) newIndex -= 1;
             final item = _cardOrder.removeAt(oldIndex);
             _cardOrder.insert(newIndex, item);
           });
           _saveCardOrder();
         },
+        // Use buildDefaultDragHandles=false to require explicit drag handles.
+        buildDefaultDragHandles: false,
       ),
     );
   }
